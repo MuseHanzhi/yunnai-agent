@@ -19,12 +19,15 @@ class Callback(ResultCallback):
 
     def on_close(self):
         # 停止播放器
-        self._stream.stop_stream()
-        self._stream.close()
-        self._player.terminate()
+        if self._stream:
+            self._stream.stop_stream()
+            self._stream.close()
+        if self._player:
+            self._player.terminate()
 
     def on_event(self, message):
         pass
 
     def on_data(self, data: bytes) -> None:
-        self._stream.write(data)
+        if self._stream:
+            self._stream.write(data)

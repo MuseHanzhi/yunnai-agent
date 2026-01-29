@@ -7,21 +7,19 @@ import json
 class AIChat:
 
     def __init__(self, system_prompt=""):
-        print(f"[{__name__}] 初始化LLM服务")
         self.__client = OpenAI(
             api_key= os.getenv('DASHSCOPE_API_KEY'),
             base_url= 'https://dashscope.aliyuncs.com/compatible-mode/v1'
         )
 
         self.__tools: list[ChatCompletionToolUnionParam] = []
-        self.__messages: list[ChatCompletionMessageParam] = [
-            {
+        self.__messages: list[ChatCompletionMessageParam] = []
+        if system_prompt:
+            self.__messages.append({
                 'role': 'system',
                 'content': system_prompt
-            }
-        ]
-        
-        print(f"[{__name__}] 初始化LLM服务 done")
+            })
+
     
     def add_tool(self, tool: ChatCompletionToolUnionParam):
         self.__tools.append(tool)
@@ -114,10 +112,12 @@ class AIChat:
     
     def on_reply(self, message: str):
         """
-        AI流式回复时调用
-        这个方法由调用者重写
+        AI流式回复普通信息时触发
         """
         ...
     
     def on_call_tool(self, id: str, name: str, arguments: dict):
+        """
+        AI调用工具时触发
+        """
         ...

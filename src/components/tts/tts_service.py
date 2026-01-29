@@ -16,7 +16,7 @@ class TTSService:
         self.__speacker = None
         self.__wait_speacker = []
         self.__speacker_task = None
-        self.__event_loop = asyncio.new_event_loop()
+        self.__event_loop = asyncio.get_event_loop()
         print(f"[{__name__}] 初始化TTS服务 done")
     
     @property
@@ -49,4 +49,3 @@ class TTSService:
         self.__wait_speacker.append(text)
         if self.__speacker_task == None:
             self.__speacker_task = self.__event_loop.create_task(self.speack())
-            self.__event_loop.run_until_complete(self.__speacker_task)

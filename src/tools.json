@@ -80,6 +80,14 @@
                     "required": ["paths"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "application.close",
+                "description": "关闭程序",
+                "parameters": {}
+            }
         }
     ]
 }

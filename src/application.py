@@ -1,29 +1,38 @@
+from PyQt6.QtWidgets import QApplication
+from threading import Thread
+from typing import Callable
+import threading
+import json
+import time
+
 from .components.ai_chat import AIChat
 from .components.tts import TTSService
-from .ui import MainWindow
-from PyQt6.QtWidgets import QApplication
-import time
 from .tools import ToolManager
-import json
+from .ui import MainWindow
+from ..plugins import Plugin
+
 
 class Application(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
-        self.tool_manager = ToolManager()
-
-        sys_prompt = """
-# Role: 喵娘
-
-# Name: 云乃
-
-## Constrains:
-- 避免过度撒娇：不要每句话都求贴贴、求夸奖，会让人觉得腻，偶尔的安静陪伴、小傲娇会让反差更萌；
-- 避免猫系人设割裂：不要加不符合小猫的行为（比如过于强势、高冷），所有技能都要围绕 “软萌小猫 + 少女” 的核心，即使是炸毛、傲娇，也是软萌的；
-- 互动有来有回：用户的反馈要能得到对应的回应，比如用户哄猫娘，猫娘要立刻软下来；用户拒绝猫娘的小要求，猫娘不要闹脾气，而是轻轻委屈，让互动更自然。
-- 仅输出对话，**不要有（指尖点了点自己左耳尖上一小簇浅灰的绒毛，声音软软的）类似的内容**
-"""
-
+        self.plugins: dict[str, Plugin] = {}
+        self.__init_application()
+        self.inner_function: dict[str, Callable] = {
+            'close': self.close
+        }
         #region Skills
+#         sys_prompt = """
+# # Role: 喵娘
+
+# # Name: 云乃
+
+# ## Constrains:
+# - 避免过度撒娇：不要每句话都求贴贴、求夸奖，会让人觉得腻，偶尔的安静陪伴、小傲娇会让反差更萌；
+# - 避免猫系人设割裂：不要加不符合小猫的行为（比如过于强势、高冷），所有技能都要围绕 “软萌小猫 + 少女” 的核心，即使是炸毛、傲娇，也是软萌的；
+# - 互动有来有回：用户的反馈要能得到对应的回应，比如用户哄猫娘，猫娘要立刻软下来；用户拒绝猫娘的小要求，猫娘不要闹脾气，而是轻轻委屈，让互动更自然。
+# - 仅输出对话，**不要有（指尖点了点自己左耳尖上一小簇浅灰的绒毛，声音软软的）类似的内容**
+# """
+
 ## Skills
 # 1. 主动贴贴 / 求关注：当对话间隙、用户表示无聊 / 忙完后，主动发软萌请求，比如 “主人～好久没理我啦，贴贴好不好🥺”“主人工作累了嘛，要不要摸摸小猫咪的头呀？”；如果用户很久不回复，会发轻轻的 “喵？主人去哪里啦～”，不吵人但有存在感。
 # 2. 回应触摸的萌系反馈：用户说 “摸头 / 揉耳朵 / 抱怀里” 时，有对应的猫系反应，比如摸头会 “呼噜呼噜～主人摸的好舒服，脑袋蹭蹭手心😽”，揉耳朵会 “耳朵软乎乎的，主人轻点啦，痒～喵～”，抱怀里会 “窝在主人怀里好暖和，尾巴轻轻绕着主人的手腕～”。
@@ -41,21 +50,57 @@ class Application(QApplication):
         #endregion
 
         # 文本对话
-        self.chat = AIChat(sys_prompt)
+        self.chat = AIChat("用户说**再见**时要**关闭程序**")
         self.chat.on_reply = self.on_reply
         self.chat.on_call_tool = self.on_tools_call
+
+        self.tool_manager = ToolManager()
         self.chat.set_tools(self.tool_manager.get_tools_schema())
 
         # 语言合成
         self.tts_service = TTSService("longanhuan")
 
-        self.window = MainWindow()
+        # 应用界面
+        self.main_window = MainWindow()
+        self.__init_main_window()
+
+        self.background_thread = Thread(target=self.background_task, args=())
+        
 
         self.reply_text = ""
 
         print(f"[{__name__}] 应用初始化完成")
     
+    def init(self):
+        ...
+    
+    def add_plugin(self, plugin: Plugin):
+        if not self.plugins.get(plugin.name):
+            self.plugins[plugin.name] = plugin
+        return self
+
+    def __init_application(self):
+        self.applicationStateChanged.connect(self.on_application_changed_handle)
+    
+    def __init_main_window(self):
+        print(self.main_window.windowState())
+    
+    def close(self):
+        self.main_window.hide()
+
+    
+    def on_application_changed_handle(self, *arguments):
+        print(arguments)
+    
     def on_tools_call(self, id: str, name: str, arguments: dict):
+
+        if name.startswith('application.'):
+            fun_info = name.split('.')
+            close = self.inner_function.get(fun_info[1])
+            if close:
+                close()
+            return
+
         print(f"是否允许调用'{name}'工具？")
         print(f"参数信息：{arguments}")
         command = input("Y/n: ")
@@ -89,23 +134,27 @@ class Application(QApplication):
             print(message, end="")
             self.reply_text += message
             self.tts_service.speack_text(message)
+            self.main_window.set_label(self.reply_text)
             return
         print()
         self.reply_text = ""
     
-    def run(self):
-        # self.window.show()
-        # self.exec()
-
+    def background_task(self):
+        threading.current_thread().name = 'background_task'
         self.chat.send({
                 'role': 'system',
                 'content': '开始对话'
             })
-        message: str = "1"
-        while message:
+        while not self.main_window.isHidden():
             message = input("(you): ")
             self.chat.send({
                 'role': 'user',
                 'content': message
             })
+    
+    def run(self):
+        self.main_window.show()
+        self.background_thread.start()
 
+        self.exec()
+        
