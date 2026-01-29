@@ -6,8 +6,8 @@ from typing import Callable
 
 class ToolManager:
 
-    def __call__(self, tool: str, args: dict):
-        return self.call(tool, args)
+    def __call__(self, name: str, args: dict):
+        return self.call(name, args)
 
     def __init__(self):
         print(f"[{__name__}] 开始初始化工具")
@@ -48,20 +48,30 @@ class ToolManager:
     def get_tools_schema(self):
         return self.tools
     
-    def call(self, tool: str, args: dict):
-        if len(tool.split('.')) != 2:
+    def call(self, name: str, args: dict):
+        if len(name.split('.')) != 2:
             return {
                 "message": "请严格按照 'module.tool_name' 的格式调用工具",
                 "data": None
             }
         
-        tool_fun = self.tool_func.get(tool)
+        # 参数校验
+        # for tool in self.tools:
+        #     if tool['function']["name"] != name:
+        #         continue
+        #     properties: dict = tool['function']["parameters"]['properties']
+        #     for property in properties:
+                
+        #         if property['type']
+        #     break
+        
+        tool_fun = self.tool_func.get(name)
         if tool_fun == None:
             return {
-                "message": f"调用失败，没有名为'{tool}'的工具",
+                "message": f"调用失败，没有名为'{name}'的工具",
                 "data": None
             }
         
-        return self.tool_func[tool](**args)
+        return self.tool_func[name](**args)
 
 

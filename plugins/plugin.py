@@ -1,8 +1,10 @@
 from typing import Callable, TYPE_CHECKING
-from openai.types.chat import ChatCompletionChunk
+from openai.types.chat import ChatCompletionChunk,ChatCompletionMessageParam
+from PyQt6.QtWidgets import QWidget
 
 if TYPE_CHECKING:
     from ..src.application import Application
+    from ..src.ui import MainWindow
 
 class Plugin:
     def __str__(self) -> str:
@@ -13,7 +15,7 @@ class Plugin:
         self.author = author
         self.version = version
     
-    def app_before_initialize(self, app: "Application"):
+    def on_app_before_initialize(self, app: "Application"):
         """
         应用程序初始化前触发
         
@@ -23,13 +25,13 @@ class Plugin:
         """
         ...
     
-    def app_after_initialize(self):
+    def on_app_after_initialized(self):
         """
         应用程序初始化后触发
         """
         ...
     
-    def ai_reply(self, content: ChatCompletionChunk):
+    def on_ai_reply(self, chunk: ChatCompletionChunk):
         """
         智能体回复时触发
         
@@ -38,7 +40,10 @@ class Plugin:
         """
         ...
     
-    def message_before_send(self, message: str):
+    def on_ai_reply_completed(self, finish_reason: str):
+        ...
+    
+    def on_message_before_send(self, *message: ChatCompletionMessageParam):
         """
         向智能体发送信息前触发
         
@@ -47,13 +52,13 @@ class Plugin:
         """
         ...
     
-    def message_before_sended(self):
+    def on_message_after_sended(self):
         """
         向智能体发送信息后触发
         """
         ...
     
-    def app_will_close(self, delay_request: Callable):
+    def on_app_will_close(self, delay_request: Callable):
         """
         向智能体发送信息前触发
         
@@ -63,5 +68,17 @@ class Plugin:
         """
         ...
     
-    def app_closed(self):
+    def on_app_closed(self):
+        ...
+    
+    def on_window_hide(self, window: QWidget):
+        ...
+    
+    def on_window_minimize(self, window: QWidget):
+        ...
+    
+    def on_window_maximize(self, window: QWidget):
+        ...
+    
+    def on_main_window_show(self, window: "MainWindow"):
         ...

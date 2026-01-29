@@ -1,3 +1,3 @@
 from .plugin import Plugin
 from .log_plugin.log_plugin import LogPlugin
-from .tts_plugin.tts_plugin import TTSPlugin
+from .tools_plugin.tools_plugin import ToolsPlugin

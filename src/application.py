@@ -1,25 +1,22 @@
-from PyQt6.QtWidgets import QApplication
+from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
+from PyQt6.QtWidgets import QApplication, QWidget
 from threading import Thread
-from typing import Callable
 import threading
 import json
-import time
 
 from .components.ai_chat import AIChat
 from .components.tts import TTSService
 from .tools import ToolManager
 from .ui import MainWindow
-from ..plugins import Plugin
+from plugins import Plugin
 
 
 class Application(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
-        self.plugins: dict[str, Plugin] = {}
-        self.__init_application()
-        self.inner_function: dict[str, Callable] = {
-            'close': self.close
-        }
+        self.plugins_map: dict[str, Plugin] = {}
+        self.plugins: list[Plugin] = []
+        self.windows: dict[str, QWidget] = {}
         #region Skills
 #         sys_prompt = """
 # # Role: 喵娘
@@ -50,111 +47,96 @@ class Application(QApplication):
         #endregion
 
         # 文本对话
-        self.chat = AIChat("用户说**再见**时要**关闭程序**")
-        self.chat.on_reply = self.on_reply
-        self.chat.on_call_tool = self.on_tools_call
 
-        self.tool_manager = ToolManager()
-        self.chat.set_tools(self.tool_manager.get_tools_schema())
+        self.ai = AIChat("**调用任何工具之前需要说明理由，否则不允许调用**")
+        self.ai.on_reply = self.on_reply
 
         # 语言合成
         self.tts_service = TTSService("longanhuan")
 
         # 应用界面
         self.main_window = MainWindow()
-        self.__init_main_window()
 
         self.background_thread = Thread(target=self.background_task, args=())
-        
 
         self.reply_text = ""
-
-        print(f"[{__name__}] 应用初始化完成")
     
-    def init(self):
-        ...
-    
-    def add_plugin(self, plugin: Plugin):
-        if not self.plugins.get(plugin.name):
-            self.plugins[plugin.name] = plugin
+    def add_plugin(self, *plugins: Plugin):
+        for plugin in plugins:
+            if not self.plugins_map.get(plugin.name):
+                self.plugins_map[plugin.name] = plugin
         return self
 
-    def __init_application(self):
+    def app_init(self):
+
+        # 触发插件Hook
+        for plugin in self.plugins_map.values():
+            self.plugins.append(plugin)
+            plugin.on_app_before_initialize(self)
+
         self.applicationStateChanged.connect(self.on_application_changed_handle)
+        
+        self.__init_main_window()   # 初始化窗体
+        
+        self.tool_manager = ToolManager()
+        self.ai.set_tools(self.tool_manager.get_tools_schema())
+
+        for plugin in self.plugins:
+            plugin.on_app_after_initialized()
     
     def __init_main_window(self):
-        print(self.main_window.windowState())
-    
-    def close(self):
-        self.main_window.hide()
-
+        # 连接信号等操作
+        self.main_window.show()
+        self.windows['main_window'] = self.main_window
+        for plugin in self.plugins:
+            plugin.on_main_window_show(self.main_window)
     
     def on_application_changed_handle(self, *arguments):
-        print(arguments)
+        # print(arguments)
+        ...
     
-    def on_tools_call(self, id: str, name: str, arguments: dict):
-
-        if name.startswith('application.'):
-            fun_info = name.split('.')
-            close = self.inner_function.get(fun_info[1])
-            if close:
-                close()
-            return
-
-        print(f"是否允许调用'{name}'工具？")
-        print(f"参数信息：{arguments}")
-        command = input("Y/n: ")
-        while command not in 'nY' and command:
-            command = input("Y/n: ")
-        command = command if command else 'Y'
-
-        reject_message = ''
-        if command == 'n':
-            reject_message = input('理由: ')
-            reject_message = reject_message if reject_message else '用户拒绝调用'
-            self.chat.send({
-                'role': 'tool',
-                'tool_call_id': id,
-                'content': reject_message
-            })
-        else:
-            call_result = self.tool_manager(name, arguments)
-            self.chat.send({
-                'role': 'tool',
-                'tool_call_id': id,
-                'content': json.dumps(call_result)
-            })
-    
-    def on_reply(self, message: str):
-        if len(self.reply_text) == 0:
-            print('(云乃): ', end='')
-            if not self.tts_service.state == "NoReady":
-                self.tts_service.start()
-        if message:
-            print(message, end="")
-            self.reply_text += message
-            self.tts_service.speack_text(message)
+    def on_reply(self, chunk: ChatCompletionChunk | None, finish_reason: str | None):
+        if chunk and finish_reason is None:
+            
+            for plugin in self.plugins:
+                plugin.on_ai_reply(chunk)
+            
+            # UI输出对话文本
+            content = chunk.choices[0].delta.content
+            if not content:
+                return
+                
+            self.reply_text += content
             self.main_window.set_label(self.reply_text)
-            return
-        print()
-        self.reply_text = ""
+
+        elif not finish_reason is None:
+            self.reply_text = ""
+            for plugin in self.plugins:
+                plugin.on_ai_reply_completed(finish_reason)
     
     def background_task(self):
         threading.current_thread().name = 'background_task'
-        self.chat.send({
+        self.ai.send({
                 'role': 'system',
                 'content': '开始对话'
             })
         while not self.main_window.isHidden():
             message = input("(you): ")
-            self.chat.send({
+            self.send_message({
                 'role': 'user',
                 'content': message
             })
     
-    def run(self):
-        self.main_window.show()
-        self.background_thread.start()
+    def send_message(self, *messages: ChatCompletionMessageParam):
+        for plugin in self.plugins:
+                plugin.on_message_before_send()
 
+        self.ai.send(*messages)
+
+        for plugin in self.plugins:
+                plugin.on_message_after_sended()
+    
+    def run(self):
+        self.background_thread.start()
         self.exec()
         
