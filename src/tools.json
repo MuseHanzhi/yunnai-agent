@@ -1,0 +1,85 @@
+{
+    "meta": {
+        "modules": [
+            "file"
+        ]
+    },
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "file.write_file",
+                "description": "将内容写入指定的文件",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "指定的文件路径"
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "写入的内容"
+                        }
+                    },
+                    "required": ["file_path", "content"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "file.read_file",
+                "description": "读取指定文件的内容",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "指定的文件路径"
+                        },
+                        "encode": {
+                            "type": "stirng",
+                            "description": "以指定的编码打开读取文件，默认utf-8"
+                        }
+                    },
+                    "required": ["file_path"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "file.get_dir_content",
+                "description": "读取指定文件夹的内容",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "指定的文件夹路径，空时返回当前工作目录的内容"
+                        }
+                    },
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "file.mkdir",
+                "description": "创建文件夹，支持递归创建",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "paths": {
+                            "type": "array[]",
+                            "description": "需要创建的文件夹路径集合"
+                        }
+                    },
+                    "required": ["paths"]
+                }
+            }
+        }
+    ]
+}
