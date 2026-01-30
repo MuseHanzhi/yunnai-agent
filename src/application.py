@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from threading import Thread
 import threading
 import asyncio
+import logging
 
 from .components.ai_chat import AIChat
 from .tools import ToolManager
@@ -13,6 +14,14 @@ from plugins import Plugin
 class Application(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
+        self.logger = logging.Logger(__name__)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        self.logger.addHandler(console_handler)
+
         self.plugins_map: dict[str, Plugin] = {}
         self.plugins: list[Plugin] = []
         self.windows: dict[str, QWidget] = {}
@@ -48,11 +57,15 @@ class Application(QApplication):
         #endregion
 
         # AIChat
+        self.logger.info("加载AIChat组件")
         self.ai = AIChat("**调用任何工具之前需要说明理由**而且说话要简短")
         self.ai.on_reply = self.on_reply
+        self.logger.info("加载AIChat组件完毕")
 
         # 应用界面
+        self.logger.info("初始化界面")
         self.main_window = MainWindow()
+        self.logger.info("初始化界面完毕")
 
         # 后台线程任务
         self.background_thread = Thread(target=self.background_thread_task, args=())
@@ -62,13 +75,14 @@ class Application(QApplication):
     
     def add_plugin(self, *plugins: Plugin):
         for plugin in plugins:
-            if not self.plugins_map.get(plugin.name):
-                print(f"[{__name__}] 加载插件 '{plugin.name}'")
-                self.plugins_map[plugin.name] = plugin
+            self.logger.info(f"加载插件 - {plugin.name}")
+            if self.plugins_map.get(plugin.name):
+                self.logger.info(f"插件被覆盖 - {plugin.name}")
+            self.plugins_map[plugin.name] = plugin
         return self
 
     def app_init(self):
-
+        self.logger.info("初始化应用程序")
         # 触发插件Hook
         for plugin in self.plugins_map.values():
             self.plugins.append(plugin)
@@ -83,16 +97,20 @@ class Application(QApplication):
 
         for plugin in self.plugins:
             plugin.on_app_after_initialized()
+        self.logger.info("初始化应用程序完毕")
     
     def __init_main_window(self):
+        self.logger.info("初始化窗体")
         # 连接信号等操作
         self.main_window.send_btn_clicked.connect(self.on_send_btn_clicked)
         self.main_window.show()
         self.windows['main_window'] = self.main_window
         for plugin in self.plugins:
             plugin.on_main_window_show(self.main_window)
+        self.logger.info("初始化窗体完毕")
     
     def on_send_btn_clicked(self, value: str):
+        self.logger.info(f"user: {value} -> assistant")
         self.main_window.set_input('')
         self.send_message({
             'role': 'user',
@@ -117,23 +135,29 @@ class Application(QApplication):
             self.main_window.set_label(self.reply_text)
 
         elif not finish_reason is None:
+            self.logger.info(f"assistant {self.reply_text} -> user")
             self.reply_text = ""
             for plugin in self.plugins:
                 plugin.on_ai_reply_completed(finish_reason)
     
     def background_thread_task(self):
         threading.current_thread().name = 'background_thread'
+        self.logger.info("初始化后台线程")
+
+        self.logger.info("初始化后台线程事件循环")
         self.background_thread_event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.background_thread_event_loop)
+        self.background_thread_event_loop.create_task(self.run_task())
 
         for plugin in self.plugins:
             plugin.on_background_thread_start()
 
-        self.background_thread_event_loop.create_task(self.run_task())
+        self.logger.info("后台线程初始化完毕, 开启事件循环")
         self.background_thread_event_loop.run_forever()
 
         for plugin in self.plugins:
             plugin.on_background_thread_end()
+        self.logger.info("后台线程退出")
     
     async def run_task(self):
         main_hided = self.main_window.isHidden()
@@ -155,26 +179,24 @@ class Application(QApplication):
                 plugin.on_message_after_sended()
     
     def send_message(self, *messages: ChatCompletionMessageParam):
-        if self.background_thread_event_loop:
-            self.background_thread_event_loop.create_task(self.aync_send_message(*messages))
-        else:
-            for plugin in self.plugins:
-                plugin.on_message_before_send()
+        for plugin in self.plugins:
+            plugin.on_message_before_send()
 
-            self.ai.send(*messages)
+        self.ai.send(*messages)
 
-            for plugin in self.plugins:
-                    plugin.on_message_after_sended()
+        for plugin in self.plugins:
+            plugin.on_message_after_sended()
     
     def delay_close(self, seconds: int):
          if seconds > 2:
               return False
-         print(f"延迟关闭: {seconds}秒")
          return True
     
     def run(self):
+        self.logger.info("开始运行程序")
         self.background_thread.start()
         self.exec()
 
         for plugin in self.plugins:
             plugin.on_app_will_close(self.delay_close)
+        self.logger.info("主线程退出")

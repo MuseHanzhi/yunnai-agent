@@ -88,6 +88,23 @@
                 "description": "关闭程序",
                 "parameters": {}
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "application.asr",
+                "description": "设置ASR模式",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "state": {
+                            "type": "string",
+                            "description": "start/stop"
+                        }
+                    },
+                    "required": ["state"]
+                }
+            }
         }
     ]
 }

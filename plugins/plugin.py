@@ -86,3 +86,13 @@ class Plugin:
     
     def on_main_window_show(self, window: "MainWindow"):
         ...
+    
+    def emit(self, name: str, arguments: dict):
+        """
+        用于插件与插件之间的通信
+        :param name: 命令
+        :type name: str
+        :param arguments: 参数
+        :type arguments: dict
+        """
+        ...

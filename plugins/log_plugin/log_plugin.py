@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from ...src.application import Application
 
 class LogPlugin(Plugin):
-    def __init__(self):
-        super().__init__('logger_plugin')
+    def __init__(self, name: str):
+        super().__init__(name)
     
     def on_app_before_initialize(self, app: "Application"):
         print("应用程序开始初始化")
@@ -24,7 +24,7 @@ class LogPlugin(Plugin):
         print("应用程序已关闭")
     
     def on_message_before_send(self, *messages: ChatCompletionMessageParam):
-        print(f"发送消息: {json.dumps(messages)}")
+        print(f"发送消息: {messages}")
     
     def on_message_before_sended(self):
         print("消息已发送")
