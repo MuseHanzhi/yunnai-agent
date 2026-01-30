@@ -1,7 +1,7 @@
 from .callback import Callback
 from dashscope.audio.tts_v2 import SpeechSynthesizer, AudioFormat
 import asyncio
-import threading
+import logging
 
 class TTSService:
     __voice: str
@@ -10,7 +10,14 @@ class TTSService:
     __speacker: SpeechSynthesizer | None
 
     def __init__(self, voice: str, model: str = "cosyvoice-v3-flash"):
-        print(f"[{__name__}] 初始化TTS服务")
+        self.logger = logging.Logger(__name__)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        self.logger.addHandler(console_handler)
+
         self.__voice = voice
         self.__model = model
         self.__callback = Callback()
@@ -18,7 +25,6 @@ class TTSService:
         self.__wait_speacker = []
         self.__speacker_task = None
         self.__event_loop: asyncio.AbstractEventLoop | None = None
-        print(f"[{__name__}] 初始化TTS服务 done")
     
     @property
     def state(self):
@@ -39,18 +45,32 @@ class TTSService:
     async def speack(self):
         while self.__wait_speacker and self.__speacker:
             await asyncio.sleep(0.01)
-            word = self.__wait_speacker.pop(0)
-            if word:
-                self.__speacker.streaming_call(word)
-        if self.__speacker:
-            self.__speacker.streaming_complete()
-        self.__speacker = None
-        self.__speacker_task = None
+            try:
+                word = self.__wait_speacker.pop(0)
+                if word:
+                    print(f"{len(self.__wait_speacker)} -> {word}")
+                    self.__speacker.streaming_call(word)
+            except IndexError:
+                break
+            except Exception as e:
+                self.logger.error(f"出现异常: {e}")
+        # if self.__speacker:
+        #     self.__speacker.streaming_complete()
+        # self.__speacker = None
+        # self.__speacker_task = None
     
     def speack_text(self, text: str | None):
         self.__wait_speacker.append(text)
-        if self.__speacker_task == None and self.__event_loop:
+        if self.__event_loop and self.__speacker_task == None:
             self.__speacker_task = self.__event_loop.create_task(self.speack())
     
     def set_event_loop(self, event_loop: asyncio.AbstractEventLoop):
         self.__event_loop = event_loop
+    
+    def about(self):
+        print("打断")
+        if self.__speacker:
+            self.__speacker.streaming_complete()
+            self.__speacker.close()
+        self.__wait_speacker.clear()
+        self.__speacker_task = None
