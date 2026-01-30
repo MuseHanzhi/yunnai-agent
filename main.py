@@ -1,6 +1,7 @@
 from plugins import (
     LogPlugin,
-    ToolsPlugin
+    ToolsPlugin,
+    TTSPlugin
 )
 from src.application import Application
 import sys
@@ -8,7 +9,8 @@ import sys
 def main():
     main_app.add_plugin(
         LogPlugin(),
-        ToolsPlugin()
+        ToolsPlugin(),
+        TTSPlugin()
     )
     main_app.app_init()
     main_app.run()

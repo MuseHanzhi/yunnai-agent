@@ -32,6 +32,9 @@ class LogPlugin(Plugin):
     def on_ai_reply(self, content: ChatCompletionChunk):
         return super().on_ai_reply(content)
 
+    def on_background_thread_start(self):
+        ...
+
     def on_window_hide(self, window: QWidget):
         print("窗体隐藏")
     

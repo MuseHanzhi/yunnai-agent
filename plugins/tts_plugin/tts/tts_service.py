@@ -1,6 +1,7 @@
 from .callback import Callback
 from dashscope.audio.tts_v2 import SpeechSynthesizer, AudioFormat
 import asyncio
+import threading
 
 class TTSService:
     __voice: str
@@ -16,7 +17,7 @@ class TTSService:
         self.__speacker = None
         self.__wait_speacker = []
         self.__speacker_task = None
-        self.__event_loop = asyncio.get_event_loop()
+        self.__event_loop: asyncio.AbstractEventLoop | None = None
         print(f"[{__name__}] 初始化TTS服务 done")
     
     @property
@@ -37,15 +38,19 @@ class TTSService:
     
     async def speack(self):
         while self.__wait_speacker and self.__speacker:
-            await asyncio.sleep(0.3)
+            await asyncio.sleep(0.01)
             word = self.__wait_speacker.pop(0)
-            self.__speacker.streaming_call(word)
+            if word:
+                self.__speacker.streaming_call(word)
         if self.__speacker:
             self.__speacker.streaming_complete()
         self.__speacker = None
         self.__speacker_task = None
     
-    def speack_text(self, text: str):
+    def speack_text(self, text: str | None):
         self.__wait_speacker.append(text)
-        if self.__speacker_task == None:
+        if self.__speacker_task == None and self.__event_loop:
             self.__speacker_task = self.__event_loop.create_task(self.speack())
+    
+    def set_event_loop(self, event_loop: asyncio.AbstractEventLoop):
+        self.__event_loop = event_loop

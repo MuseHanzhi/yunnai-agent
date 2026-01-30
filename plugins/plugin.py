@@ -14,6 +14,7 @@ class Plugin:
         self.name = name
         self.author = author
         self.version = version
+
     
     def on_app_before_initialize(self, app: "Application"):
         """
@@ -57,6 +58,12 @@ class Plugin:
         向智能体发送信息后触发
         """
         ...
+
+    def on_background_thread_start(self):
+        ...
+    
+    def on_background_thread_end(self):
+        ...
     
     def on_app_will_close(self, delay_request: Callable):
         """
@@ -66,9 +73,6 @@ class Plugin:
         :param delay_request: 请求延时关闭，每次请求不能超过2秒 delay_request(2)
         :type delay_request: Callable
         """
-        ...
-    
-    def on_app_closed(self):
         ...
     
     def on_window_hide(self, window: QWidget):

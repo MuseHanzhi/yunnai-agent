@@ -2,10 +2,9 @@ from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 from PyQt6.QtWidgets import QApplication, QWidget
 from threading import Thread
 import threading
-import json
+import asyncio
 
 from .components.ai_chat import AIChat
-from .components.tts import TTSService
 from .tools import ToolManager
 from .ui import MainWindow
 from plugins import Plugin
@@ -17,6 +16,8 @@ class Application(QApplication):
         self.plugins_map: dict[str, Plugin] = {}
         self.plugins: list[Plugin] = []
         self.windows: dict[str, QWidget] = {}
+        self.background_thread_event_loop: None | asyncio.AbstractEventLoop = None
+        self.foreground_thread_event_loop = asyncio.new_event_loop()
         #region Skills
 #         sys_prompt = """
 # # Role: 喵娘
@@ -46,24 +47,23 @@ class Application(QApplication):
 # 13. 小迷糊的小失误：偶尔有点小猫的小迷糊，比0如记不住小事，“哎呀～主人，我忘记刚才想说什么啦😣，脑袋空空的，像被小鱼干勾走了魂～”，迷糊的样子更显软萌，让人想宠。
         #endregion
 
-        # 文本对话
-
-        self.ai = AIChat("**调用任何工具之前需要说明理由，否则不允许调用**")
+        # AIChat
+        self.ai = AIChat("**调用任何工具之前需要说明理由**而且说话要简短")
         self.ai.on_reply = self.on_reply
-
-        # 语言合成
-        self.tts_service = TTSService("longanhuan")
 
         # 应用界面
         self.main_window = MainWindow()
 
-        self.background_thread = Thread(target=self.background_task, args=())
+        # 后台线程任务
+        self.background_thread = Thread(target=self.background_thread_task, args=())
 
         self.reply_text = ""
+        self.set_ui_task = None
     
     def add_plugin(self, *plugins: Plugin):
         for plugin in plugins:
             if not self.plugins_map.get(plugin.name):
+                print(f"[{__name__}] 加载插件 '{plugin.name}'")
                 self.plugins_map[plugin.name] = plugin
         return self
 
@@ -86,11 +86,19 @@ class Application(QApplication):
     
     def __init_main_window(self):
         # 连接信号等操作
+        self.main_window.send_btn_clicked.connect(self.on_send_btn_clicked)
         self.main_window.show()
         self.windows['main_window'] = self.main_window
         for plugin in self.plugins:
             plugin.on_main_window_show(self.main_window)
     
+    def on_send_btn_clicked(self, value: str):
+        self.main_window.set_input('')
+        self.send_message({
+            'role': 'user',
+            'content': value
+        })
+
     def on_application_changed_handle(self, *arguments):
         # print(arguments)
         ...
@@ -105,7 +113,6 @@ class Application(QApplication):
             content = chunk.choices[0].delta.content
             if not content:
                 return
-                
             self.reply_text += content
             self.main_window.set_label(self.reply_text)
 
@@ -114,20 +121,31 @@ class Application(QApplication):
             for plugin in self.plugins:
                 plugin.on_ai_reply_completed(finish_reason)
     
-    def background_task(self):
-        threading.current_thread().name = 'background_task'
-        self.ai.send({
-                'role': 'system',
-                'content': '开始对话'
-            })
-        while not self.main_window.isHidden():
-            message = input("(you): ")
-            self.send_message({
-                'role': 'user',
-                'content': message
-            })
+    def background_thread_task(self):
+        threading.current_thread().name = 'background_thread'
+        self.background_thread_event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.background_thread_event_loop)
+
+        for plugin in self.plugins:
+            plugin.on_background_thread_start()
+
+        self.background_thread_event_loop.create_task(self.run_task())
+        self.background_thread_event_loop.run_forever()
+
+        for plugin in self.plugins:
+            plugin.on_background_thread_end()
     
-    def send_message(self, *messages: ChatCompletionMessageParam):
+    async def run_task(self):
+        main_hided = self.main_window.isHidden()
+        while not main_hided:
+            await asyncio.sleep(0.1)
+            main_hided = self.main_window.isHidden()
+        
+        if self.background_thread_event_loop:
+            self.background_thread_event_loop.stop()
+    
+    async def aync_send_message(self, *messages: ChatCompletionMessageParam):
+        await asyncio.sleep(0.01)
         for plugin in self.plugins:
                 plugin.on_message_before_send()
 
@@ -136,7 +154,27 @@ class Application(QApplication):
         for plugin in self.plugins:
                 plugin.on_message_after_sended()
     
+    def send_message(self, *messages: ChatCompletionMessageParam):
+        if self.background_thread_event_loop:
+            self.background_thread_event_loop.create_task(self.aync_send_message(*messages))
+        else:
+            for plugin in self.plugins:
+                plugin.on_message_before_send()
+
+            self.ai.send(*messages)
+
+            for plugin in self.plugins:
+                    plugin.on_message_after_sended()
+    
+    def delay_close(self, seconds: int):
+         if seconds > 2:
+              return False
+         print(f"延迟关闭: {seconds}秒")
+         return True
+    
     def run(self):
         self.background_thread.start()
         self.exec()
-        
+
+        for plugin in self.plugins:
+            plugin.on_app_will_close(self.delay_close)

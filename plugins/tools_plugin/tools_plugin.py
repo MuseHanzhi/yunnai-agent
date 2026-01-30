@@ -3,6 +3,8 @@ from plugins import Plugin
 from src.tools import ToolManager
 import json
 from typing import TYPE_CHECKING
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QSize
 
 if TYPE_CHECKING:
     from src.application import Application
@@ -57,17 +59,20 @@ class ToolsPlugin(Plugin):
             'arguments': ''
         }
 
-        print(f"参数信息：{arguments}")
-        print(f"是否助手允许调用'{name}'工具？")
-        command = input("Y/n: ")
-        while command not in 'nY' and command:
-            command = input("Y/n: ")
-        command = command if command else 'Y'
+        dialog = QMessageBox()
+        dialog.setFixedSize(QSize(400, 200))
+        dialog.setWindowTitle(f"是否助手允许调用'{name}'工具？")
+        dialog.setText(f"参数信息：{arguments}")
 
-        reject_message = ''
-        if command == 'n':  # 拒绝调用处理
-            reject_message = input('理由: ')
-            reject_message = reject_message if reject_message else '用户拒绝调用'
+        dialog.setStandardButtons(
+            QMessageBox.StandardButton.Yes |
+            QMessageBox.StandardButton.No
+        )
+
+        res = dialog.exec()
+        result = QMessageBox.StandardButton(res)
+
+        if result == QMessageBox.StandardButton.No:  # 拒绝调用处理
             self.application.send_message(
                 {
                     'role': 'assistant',
@@ -86,7 +91,7 @@ class ToolsPlugin(Plugin):
                 {
                 'role': 'tool',
                 'tool_call_id': id,
-                'content': reject_message
+                'content': '用户拒绝调用'
             })
         else:   # 允许调用工具
             call_result = self.tools_manager(name, json.loads(arguments))

@@ -26,7 +26,7 @@ class Callback(ResultCallback):
             self._player.terminate()
 
     def on_event(self, message):
-        pass
+        ...
 
     def on_data(self, data: bytes) -> None:
         if self._stream:
