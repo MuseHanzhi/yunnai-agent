@@ -9,6 +9,7 @@ from .components.ai_chat import AIChat
 from .tools import ToolManager
 from .ui import MainWindow
 from plugins import Plugin
+from .core.plugin_manager import PluginManager
 
 
 class Application(QApplication):
@@ -22,8 +23,7 @@ class Application(QApplication):
         )
         self.logger.addHandler(console_handler)
 
-        self.plugins_map: dict[str, Plugin] = {}
-        self.plugins: list[Plugin] = []
+        self.plugin_manager = PluginManager()
         self.windows: dict[str, QWidget] = {}
         self.background_thread_event_loop: None | asyncio.AbstractEventLoop = None
         self.foreground_thread_event_loop = asyncio.new_event_loop()
@@ -58,7 +58,7 @@ class Application(QApplication):
 
         # AIChat
         self.logger.info("加载AIChat组件")
-        self.ai = AIChat("**调用任何工具之前需要说明理由**而且说话要简短")
+        self.ai = AIChat("**调用任何工具之前需要说明理由**而且说话要简短，口语化表达")
         self.ai.on_reply = self.on_reply
         self.logger.info("加载AIChat组件完毕")
 
@@ -74,19 +74,14 @@ class Application(QApplication):
         self.set_ui_task = None
     
     def add_plugin(self, *plugins: Plugin):
-        for plugin in plugins:
-            self.logger.info(f"加载插件 - {plugin.name}")
-            if self.plugins_map.get(plugin.name):
-                self.logger.info(f"插件被覆盖 - {plugin.name}")
-            self.plugins_map[plugin.name] = plugin
-        return self
+        self.plugin_manager.add(*plugins)
 
     def app_init(self):
         self.logger.info("初始化应用程序")
-        # 触发插件Hook
-        for plugin in self.plugins_map.values():
-            self.plugins.append(plugin)
-            plugin.on_app_before_initialize(self)
+        self.plugin_manager.trigger(
+            "on_app_before_initialize",
+            app = self
+            )
 
         self.applicationStateChanged.connect(self.on_application_changed_handle)
         
@@ -95,8 +90,8 @@ class Application(QApplication):
         self.tool_manager = ToolManager()
         self.ai.set_tools(self.tool_manager.get_tools_schema())
 
-        for plugin in self.plugins:
-            plugin.on_app_after_initialized()
+        # 触发插件对应时机
+        self.plugin_manager.trigger("on_app_after_initialized")
         self.logger.info("初始化应用程序完毕")
     
     def __init_main_window(self):
@@ -105,17 +100,20 @@ class Application(QApplication):
         self.main_window.send_btn_clicked.connect(self.on_send_btn_clicked)
         self.main_window.show()
         self.windows['main_window'] = self.main_window
-        for plugin in self.plugins:
-            plugin.on_main_window_show(self.main_window)
+        self.plugin_manager.trigger(
+            "on_main_window_show",
+            window = self.windows
+            )
         self.logger.info("初始化窗体完毕")
     
     def on_send_btn_clicked(self, value: str):
         self.logger.info(f"user: {value} -> assistant")
+        if self.background_thread_event_loop:
+            self.background_thread_event_loop.create_task(self.sync_send_message({
+                "role": "user",
+                "content": value
+            }))
         self.main_window.set_input('')
-        self.send_message({
-            'role': 'user',
-            'content': value
-        })
 
     def on_application_changed_handle(self, *arguments):
         # print(arguments)
@@ -123,22 +121,33 @@ class Application(QApplication):
     
     def on_reply(self, chunk: ChatCompletionChunk | None, finish_reason: str | None):
         if chunk and finish_reason is None:
+            self.plugin_manager.trigger(
+                "on_ai_reply",
+                chunk = chunk
+            )
             
-            for plugin in self.plugins:
-                plugin.on_ai_reply(chunk)
-            
+            # if chunk.id:
+            #     self.main_window.clear_text()
+            #     self.main_window.new_line()
+
             # UI输出对话文本
             content = chunk.choices[0].delta.content
             if not content:
                 return
+            
+            # if content.startswith('\n') or content.endswith('\n'):
+            #     self.main_window.new_line()
+            #     self.reply_text = ""
             self.reply_text += content
             self.main_window.set_label(self.reply_text)
 
         elif not finish_reason is None:
             self.logger.info(f"assistant {self.reply_text} -> user")
             self.reply_text = ""
-            for plugin in self.plugins:
-                plugin.on_ai_reply_completed(finish_reason)
+            self.plugin_manager.trigger(
+                "on_ai_reply_completed",
+                finish_reason = finish_reason
+            )
     
     def background_thread_task(self):
         threading.current_thread().name = 'background_thread'
@@ -149,14 +158,12 @@ class Application(QApplication):
         asyncio.set_event_loop(self.background_thread_event_loop)
         self.background_thread_event_loop.create_task(self.run_task())
 
-        for plugin in self.plugins:
-            plugin.on_background_thread_start()
+        self.plugin_manager.trigger("on_background_thread_start")
 
         self.logger.info("后台线程初始化完毕, 开启事件循环")
         self.background_thread_event_loop.run_forever()
 
-        for plugin in self.plugins:
-            plugin.on_background_thread_end()
+        self.plugin_manager.trigger("on_background_thread_end")
         self.logger.info("后台线程退出")
     
     async def run_task(self):
@@ -165,27 +172,22 @@ class Application(QApplication):
             await asyncio.sleep(0.1)
             main_hided = self.main_window.isHidden()
         
+        self.plugin_manager.trigger(
+            "on_window_hide",
+            window = self.main_window
+            )
+
         if self.background_thread_event_loop:
             self.background_thread_event_loop.stop()
     
-    async def aync_send_message(self, *messages: ChatCompletionMessageParam):
+    async def sync_send_message(self, *messages: ChatCompletionMessageParam):
         await asyncio.sleep(0.01)
-        for plugin in self.plugins:
-                plugin.on_message_before_send()
-
-        self.ai.send(*messages)
-
-        for plugin in self.plugins:
-                plugin.on_message_after_sended()
+        self.send_message(*messages)
     
     def send_message(self, *messages: ChatCompletionMessageParam):
-        for plugin in self.plugins:
-            plugin.on_message_before_send()
-
+        self.plugin_manager.trigger("on_message_before_send")
         self.ai.send(*messages)
-
-        for plugin in self.plugins:
-            plugin.on_message_after_sended()
+        self.plugin_manager.trigger("on_message_after_sended")
     
     def delay_close(self, seconds: int):
          if seconds > 2:
@@ -197,6 +199,7 @@ class Application(QApplication):
         self.background_thread.start()
         self.exec()
 
-        for plugin in self.plugins:
-            plugin.on_app_will_close(self.delay_close)
+        self.plugin_manager.trigger("on_app_will_close", delay_request = self.delay_close)
+
+        self.background_thread.join()   # 后台线程先退出
         self.logger.info("主线程退出")

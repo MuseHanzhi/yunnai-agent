@@ -3,6 +3,7 @@ import json
 import inspect
 from importlib.machinery import SourceFileLoader
 from typing import Callable
+import logging
 
 class ToolManager:
 
@@ -10,7 +11,6 @@ class ToolManager:
         return self.call(name, args)
 
     def __init__(self):
-        print(f"[{__name__}] 开始初始化工具")
         self.tools = []
         self.tool_func: dict[str, Callable] = {}
         self.root_path = path.abspath(path.join("src", "tools"))
@@ -42,7 +42,9 @@ class ToolManager:
             module = SourceFileLoader(module_name, module_path).load_module()
             functions = inspect.getmembers(module, inspect.isfunction)
             for (name, func) in functions:
-                print(f"[{__name__}] 加载工具 '{module_name}.{name}'")
+                logging.info(
+                    f"加载工具 '{module_name}.{name}'"
+                )
                 self.tool_func[f"{module_name}.{name}"] = func
     
     def get_tools_schema(self):
@@ -68,7 +70,7 @@ class ToolManager:
         tool_fun = self.tool_func.get(name)
         if tool_fun == None:
             return {
-                "message": f"调用失败，没有名为'{name}'的工具",
+                "message": f"调用失败，程序没有名为'{name}'的工具",
                 "data": None
             }
         

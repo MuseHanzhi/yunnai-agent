@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 class ToolsPlugin(Plugin):
     def __init__(self, name: str, inner_tool: dict[str, typing.Callable] = {}, inner_flag: str = "application"):
-        super().__init__(name)
+        super().__init__(name, desc="TTS，给予智能体调用工具的能力")
         self.logger = logging.Logger(__name__)
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
@@ -39,6 +39,8 @@ class ToolsPlugin(Plugin):
     def on_app_before_initialize(self, app: "Application"):
         self.application = app
         app.ai.set_tools(self.tools_manager.get_tools_schema())
+    
+    def on_background_thread_start(self):
         self.event_loop = asyncio.get_event_loop()
     
     def on_ai_reply(self, chunk: ChatCompletionChunk):

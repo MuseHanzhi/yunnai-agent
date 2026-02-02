@@ -44,20 +44,21 @@ class TTSService:
     
     async def speack(self):
         while self.__wait_speacker and self.__speacker:
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.05)
             try:
                 word = self.__wait_speacker.pop(0)
                 if word:
-                    print(f"{len(self.__wait_speacker)} -> {word}")
                     self.__speacker.streaming_call(word)
             except IndexError:
                 break
             except Exception as e:
                 self.logger.error(f"出现异常: {e}")
-        # if self.__speacker:
-        #     self.__speacker.streaming_complete()
-        # self.__speacker = None
-        # self.__speacker_task = None
+        if self.__speacker:
+            self.__speacker.streaming_complete()
+        self.__speacker = None
+        self.__speacker_task = None
+        self.logger.info("TTS合成结束")
+        self.on_tts_end()
     
     def speack_text(self, text: str | None):
         self.__wait_speacker.append(text)
@@ -68,9 +69,14 @@ class TTSService:
         self.__event_loop = event_loop
     
     def about(self):
-        print("打断")
         if self.__speacker:
-            self.__speacker.streaming_complete()
-            self.__speacker.close()
+            try:
+                self.__speacker.streaming_complete()
+                self.__speacker.close()
+            except:
+                ...
         self.__wait_speacker.clear()
         self.__speacker_task = None
+    
+    def on_tts_end(self):
+        ...

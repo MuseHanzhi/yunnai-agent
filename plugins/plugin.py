@@ -8,13 +8,20 @@ if TYPE_CHECKING:
 
 class Plugin:
     def __str__(self) -> str:
-        return f"<plguin: {self.name}, author: {self.author}, ver: {self.version}>"
+        return f"<plguin: {self.name}, author: {self.author}, ver: {self.version}, desc: {self.desc}, state: {self.state}>"
 
-    def __init__(self, name: str, author: str = "", version: str = "1.0"):
+    def __init__(self, name: str, author: str = "", version: str = "1.0", desc: str = ""):
         self.name = name
         self.author = author
         self.version = version
+        self.desc = desc
+        self.state = True
+    
+    def init(self):
+        ...
 
+    def set_state(self, state: bool):
+        self.state = state
     
     def on_app_before_initialize(self, app: "Application"):
         """

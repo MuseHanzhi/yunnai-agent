@@ -39,7 +39,7 @@
                             "description": "指定的文件路径"
                         },
                         "encode": {
-                            "type": "stirng",
+                            "type": "string",
                             "description": "以指定的编码打开读取文件，默认utf-8"
                         }
                     },
@@ -84,25 +84,29 @@
         {
             "type": "function",
             "function": {
-                "name": "application.close",
-                "description": "关闭程序",
+                "name": "application.plugin_list",
+                "description": "获取插件列表",
                 "parameters": {}
             }
         },
         {
             "type": "function",
             "function": {
-                "name": "application.asr",
-                "description": "设置ASR模式",
+                "name": "application.set_plugin_state",
+                "description": "获取插件列表",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "state": {
+                        "name": {
                             "type": "string",
-                            "description": "start/stop"
+                            "description": "插件名称"
+                        },
+                        "state": {
+                            "type": "boolean",
+                            "description": "插件状态"
                         }
                     },
-                    "required": ["state"]
+                    "required": ["name", "state"]
                 }
             }
         }

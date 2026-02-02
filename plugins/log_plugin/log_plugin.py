@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 class LogPlugin(Plugin):
     def __init__(self, name: str):
-        super().__init__(name)
+        super().__init__(name, desc="TTS，在程序的某个关键时刻输出日志")
     
     def on_app_before_initialize(self, app: "Application"):
         print("应用程序开始初始化")
@@ -28,9 +28,6 @@ class LogPlugin(Plugin):
     
     def on_message_before_sended(self):
         print("消息已发送")
-    
-    def on_ai_reply(self, content: ChatCompletionChunk):
-        return super().on_ai_reply(content)
 
     def on_background_thread_start(self):
         ...

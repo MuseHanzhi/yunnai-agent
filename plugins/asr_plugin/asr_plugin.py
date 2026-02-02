@@ -3,6 +3,7 @@ from dashscope.audio.asr import (
     RecognitionCallback,
     Recognition
 )
+from openai.types.chat import ChatCompletionChunk
 from src.application import Application
 from plugins import Plugin
 from pyaudio import PyAudio
@@ -17,7 +18,7 @@ if typing.TYPE_CHECKING:
 
 class ASRPlugin(Plugin, RecognitionCallback):
     def __init__(self, name: str, is_open: bool=False, channels=1, sample_rate=16000, block_size = 3200):
-        super().__init__(name)
+        super().__init__(name, desc="语音识别功能，使用麦克风直接和智能体对话")
         self.logger = logging.Logger(__name__)
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
@@ -45,7 +46,7 @@ class ASRPlugin(Plugin, RecognitionCallback):
 
         self.words = ""
         self.is_open = is_open
-        self.replying = False
+        self.allow_send = True
     
     def on_open(self):
         self.logger.info(f"接收麦克风音频")
@@ -55,10 +56,17 @@ class ASRPlugin(Plugin, RecognitionCallback):
                                                         rate=self.sample_rate,
                                                         input=True)
     
+    def on_ai_reply(self, chunk: ChatCompletionChunk):
+        self.stop_send()
+    
     def on_close(self):
+        self.logger.info("关闭语音识别")
         if self.micro_phone_stream:
-            self.micro_phone_stream.stop_stream()
-            self.micro_phone_stream.close()
+            try:
+                self.micro_phone_stream.stop_stream()
+                self.micro_phone_stream.close()
+            except:
+                ...
         
         self.micro_phone.terminate()
         self.micro_phone_stream = None
@@ -67,21 +75,21 @@ class ASRPlugin(Plugin, RecognitionCallback):
         sentence = result.get_sentence()
         if 'text' in sentence:
             if isinstance(sentence, dict) and self.app:
-                text = sentence.get('text', "")
+                text: str = sentence.get('text', "")
                 self.logger.info(f"mic -> {text}")
                 self.app.main_window.set_input(text)
 
-                tts = self.app.plugins_map.get('tts_plugin')
-                if tts:
-                    tts.emit('about', {})
-
-                if RecognitionResult.is_sentence_end(sentence):
-                    self.app.send_message({
-                        'role': 'user',
-                        'content': text
-                    })
+                if RecognitionResult.is_sentence_end(sentence) and text.strip():
+                    if self.event_loop:
+                        self.event_loop.create_task(
+                                self.app.sync_send_message({
+                                'role': 'user',
+                                'content': text
+                            })
+                        )
                     self.app.main_window.set_input("")
-                    self.replying = True
+                    self.logger.info("说话结束")
+                    self.stop_send()
     
     def on_error(self, result: RecognitionResult) -> None:
         self.logger.error(f"出现错误 - id: {result.request_id} - error: {result.message}")
@@ -98,17 +106,17 @@ class ASRPlugin(Plugin, RecognitionCallback):
             self.recognition.start()
             self.logger.info(f"开始接收音频流")
             while self.micro_phone_task and self.micro_phone_stream:
-                if not self.replying:
+                await asyncio.sleep(0.01)
+                if self.allow_send:
                     data = self.micro_phone_stream.read(self.block_size, False)
                     self.recognition.send_audio_frame(data)
-                await asyncio.sleep(0.01)
         except Exception as e:
             self.logger.error(f"出现异常: {e}")
             return
-
-        self.logger.info(f"准备结束接收音频流")
-        self.recognition.stop()
-        self.logger.info(f"结束接收音频流")
+        finally:
+            self.logger.info(f"准备结束接收音频流")
+            self.recognition.stop()
+            self.logger.info(f"结束接收音频流")
 
 
     def on_background_thread_start(self):
@@ -116,12 +124,20 @@ class ASRPlugin(Plugin, RecognitionCallback):
         if self.is_open:
             self.micro_phone_task = self.event_loop.create_task(self.start_stream())
     
-    def emit(self, name, arguments):
-        self.logger.info(f"设置插件状态: {name}")
-        if name == "start" and self.event_loop:
-            self.micro_phone_task = self.event_loop.create_task(self.start_stream())
+    def emit(self, name: str, arguments: dict):
         if name == "stop":
-            self.micro_phone_task = None
+            self.stop_send()
+        elif name == "continue":
+            self.continue_send()
+        return super().emit(name, arguments)
     
-    def on_ai_reply_completed(self, finish_reason: str):
-        self.replying = False
+    def continue_send(self):
+        self.logger.info("继续发送")
+        self.allow_send = True
+
+    def stop_send(self):
+        self.logger.info("停止发送")
+        self.allow_send = False
+
+    def on_app_will_close(self, delay_request):
+        self.micro_phone_task = None
