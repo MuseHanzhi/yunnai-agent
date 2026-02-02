@@ -44,7 +44,7 @@ class TTSService:
     
     async def speack(self):
         while self.__wait_speacker and self.__speacker:
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.1)
             try:
                 word = self.__wait_speacker.pop(0)
                 if word:

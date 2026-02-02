@@ -41,7 +41,7 @@ class ASRPlugin(Plugin, RecognitionCallback):
             format="pcm",
             sample_rate=sample_rate,
             semantic_punctuation_enabled=False,
-            callback=self,
+            callback=self
         )
 
         self.words = ""
