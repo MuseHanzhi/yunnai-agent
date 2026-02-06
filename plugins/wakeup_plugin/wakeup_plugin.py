@@ -1,0 +1,111 @@
+from plugins import Plugin
+import typing
+import pvporcupine
+from pvrecorder import PvRecorder
+import asyncio
+import os
+import logging
+
+if typing.TYPE_CHECKING:
+    from src.application import Application
+
+class WakeupPlugin(Plugin):
+    def __init__(self, name: str, keyword_paths: list[str], lang='zh', wakeup_word = "") -> None:
+        super().__init__(name, desc="唤醒词检测")
+        access_key = os.environ.get("PORCUPINE_ACCESSKEY")
+        if not access_key:
+            raise Exception("请为'PORCUPINE_ACCESSKEY'设置环境变量，提供访问令牌")
+        
+        self.logger = logging.Logger(__name__)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        self.logger.addHandler(console_handler)
+
+        temp_keyword_paths = []
+        for keyword_path in keyword_paths:
+            if not os.path.exists(keyword_path):
+                continue
+            temp_keyword_paths.append(keyword_path)
+
+        if len(temp_keyword_paths) == 0:
+            raise Exception("唤醒词没有有效的文件路径")
+        
+        model_path = os.path.join("wakeup_models", f'porcupine_params_{lang}.pv')
+        if not os.path.exists(model_path):
+            raise Exception("模型文件不存在")
+
+        self.wakeup_word = wakeup_word
+        self.porcupine = pvporcupine.create(
+            access_key=access_key,
+            keyword_paths=temp_keyword_paths,
+            model_path=model_path
+        )
+
+        self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
+
+        self.listen_task: None | asyncio.Task = None
+        self.app: "None | Application" = None
+        self.event_loop: asyncio.AbstractEventLoop | None = None
+
+    def on_app_before_initialize(self, app: "Application"):
+        self.app = app
+    
+    def on_background_thread_start(self):
+        self.event_loop = asyncio.get_event_loop()
+        self.listen_task = self.event_loop.create_task(self.start_listen())
+    
+    async def start_listen(self):
+        self.logger.info("开始唤醒词检测")
+        self.recorder.start()
+        while self.listen_task and self.recorder.is_recording:
+            try:
+                pcm = self.recorder.read()
+                result = self.porcupine.process(pcm)
+                if result >= 0:
+                    self.logger.info("检测到唤醒词")
+                    self.detect_handler()
+                    self.listen_task = None
+                await asyncio.sleep(0.01)
+            except Exception as e:
+                self.logger.error(f"出现异常: {e}")
+
+    def detect_handler(self):
+        if not self.event_loop:
+            self.logger.warning("没有事件循环实例")
+            return
+        if not self.app:
+            self.logger.warning("没有主程序实例")
+            if self.recorder.is_recording:
+                self.recorder.stop()
+            self.recorder.delete()
+            self.porcupine.delete()
+            return
+        asr = self.app.plugin_manager.get_plugin('asr_plugin')
+        if asr:
+            asr.emit('start', {})
+            return
+        self.logger.warning("获取不到ASR插件")
+
+        if self.wakeup_word:
+            self.event_loop.create_task(
+                self.app.sync_send_message({
+                    "role": "user",
+                    "content": self.wakeup_word
+                })
+            )
+    
+    def on_app_will_close(self, delay_request):
+        if self.recorder.is_recording:
+            self.recorder.stop()
+        self.recorder.delete()
+        self.porcupine.delete()
+    
+    def emit(self, name: str, arguments: dict):
+        if name == "stop":
+            self.recorder.stop()
+            self.listen_task = None
+        elif name == "start" and self.event_loop:
+            self.listen_task = self.event_loop.create_task(self.start_listen())

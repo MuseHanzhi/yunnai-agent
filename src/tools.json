@@ -109,6 +109,14 @@
                     "required": ["name", "state"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "application.idle",
+                "description": "闲置，用户告别的时候调用",
+                "parameters": {}
+            }
         }
     ]
 }

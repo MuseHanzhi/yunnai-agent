@@ -2,7 +2,8 @@ from plugins import (
     LogPlugin,
     ToolsPlugin,
     TTSPlugin,
-    ASRPlugin
+    ASRPlugin,
+    WakeupPlugin
 )
 from src.application import Application
 import logging
@@ -28,6 +29,17 @@ def set_plugin_state(name: str, state: bool):
         return {
             "message": e
         }
+
+def idle():
+    try:
+        main_app.plugin_manager.emit("asr_plugin", "stop", {})
+        main_app.plugin_manager.emit("wakeup_plugin", "start", {})
+    except:
+        ...
+    return {
+        "message": "OK"
+        }
+
     
 
 def main():
@@ -35,7 +47,8 @@ def main():
         LogPlugin("log_plugin"),
         ToolsPlugin("tools_plugin", inner_tool=inner_tools),
         TTSPlugin("tts_plugin"),
-        ASRPlugin("asr_plugin", True),
+        ASRPlugin("asr_plugin", False),
+        WakeupPlugin("wakeup_plugin", ["wakeup_models/nihao-yunnai_zh_windows_v4_0_0.ppn"], wakeup_word="你好云乃"),
     )
     main_app.app_init()
     main_app.run()
@@ -43,7 +56,8 @@ def main():
 main_app = Application(sys.argv)
 inner_tools = {
     "plugin_list": get_plugin_list,
-    "set_plugin_state": set_plugin_state
+    "set_plugin_state": set_plugin_state,
+    "idle": idle
 }
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"

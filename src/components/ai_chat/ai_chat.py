@@ -50,6 +50,7 @@ class AIChat:
 
         # 处理流式回复
         for chunk in completion:
+            print("replying...")
             self.on_reply(chunk, None)
         self.on_reply(None, chunk.choices[0].finish_reason)
     

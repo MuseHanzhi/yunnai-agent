@@ -58,7 +58,7 @@ class Application(QApplication):
 
         # AIChat
         self.logger.info("加载AIChat组件")
-        self.ai = AIChat("**调用任何工具之前需要说明理由**而且说话要简短，口语化表达")
+        self.ai = AIChat("你的名字叫**云乃**是用户的好朋友  **调用任何工具之前需要说明理由**而且说话要简短，口语化表达，**道别时调用'application.idle'**")
         self.ai.on_reply = self.on_reply
         self.logger.info("加载AIChat组件完毕")
 

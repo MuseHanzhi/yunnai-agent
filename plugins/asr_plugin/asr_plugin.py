@@ -129,6 +129,8 @@ class ASRPlugin(Plugin, RecognitionCallback):
             self.stop_send()
         elif name == "continue":
             self.continue_send()
+        elif name == "start" and self.event_loop:
+            self.micro_phone_task = self.event_loop.create_task(self.start_stream())
         return super().emit(name, arguments)
     
     def continue_send(self):

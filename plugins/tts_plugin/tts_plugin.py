@@ -56,6 +56,5 @@ class TTSPlugin(Plugin):
             self.tts.about()
     
     def tts_end(self):
-        print("我靠: ", self.asr_plugin)
         if self.asr_plugin:
             self.asr_plugin.emit("continue", {})
