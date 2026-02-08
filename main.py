@@ -32,8 +32,8 @@ def set_plugin_state(name: str, state: bool):
 
 def idle():
     try:
-        main_app.plugin_manager.emit("asr_plugin", "stop")
-        main_app.plugin_manager.emit("wakeup_plugin", "start")
+        asr_plugin.emit("stop", {})
+        wakeup_plugin.emit("start", {})
     except:
         ...
     return {
@@ -42,21 +42,38 @@ def idle():
 
 
 def wakeup_handler():
-    main_app.plugin_manager.emit("asr_plugin", "start")
+    try:
+        asr_plugin.emit("start", {})
+    except:
+        ...
+
+def speak_end(_text: str):
+    try:
+        wakeup_plugin.emit("start", {})
+    except Exception as e:
+        logging.error(f"出现错误: {e}")
+
+def asr_ended():
+    speak_end("")
 
 def setup_plugins():
-    wakeup = WakeupPlugin(
+    global wakeup_plugin, asr_plugin
+    wakeup_plugin = WakeupPlugin(
         "wakeup_plugin",
         ["wakeup_models/nihao-yunnai_zh_windows_v4_0_0.ppn"],
         text="",
         callback=wakeup_handler)
     
+    asr_plugin = ASRPlugin("asr_plugin", end_time=3000)
+    asr_plugin.bind_speak_end(speak_end)
+    asr_plugin.bind_ended(asr_ended)
+    
     main_app.add_plugin(
-        # wakeup,
+        wakeup_plugin,
+        asr_plugin,
         LogPlugin("log_plugin"),
         ToolsPlugin("tools_plugin", inner_tool=inner_tools),
-        # TTSPlugin("tts_plugin"),
-        # ASRPlugin("asr_plugin", False)
+        TTSPlugin("tts_plugin"),
         )
 
 def main():
@@ -64,6 +81,8 @@ def main():
     main_app.app_init()
     main_app.run()
 
+wakeup_plugin: WakeupPlugin
+asr_plugin: ASRPlugin
 main_app = Application(sys.argv)
 inner_tools = {
     "plugin_list": get_plugin_list,

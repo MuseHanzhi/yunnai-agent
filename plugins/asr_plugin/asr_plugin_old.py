@@ -44,7 +44,6 @@ class ASRPlugin(Plugin, RecognitionCallback):
         self.end_speak_time = 0
         self.end_time = end_time / 1000
         self.started = False
-        self.is_closing = False  # 添加关闭标志，防止重复关闭
 
         self.micro_phone = PyAudio()
         self.micro_phone_stream: pyaudio._Stream | None = None
@@ -55,12 +54,12 @@ class ASRPlugin(Plugin, RecognitionCallback):
             semantic_punctuation_enabled=False,
             callback=self
         )
-
-
+        
+    
     def on_open(self):
         logger.info("开始语音转文字")
         self.start_micro()
-
+    
     def start_micro(self):
         logger.info(f"打开麦克风")
         try:
@@ -72,21 +71,15 @@ class ASRPlugin(Plugin, RecognitionCallback):
                                                                 input=True)
         except Exception as e:
             logger.error(f"出现异常: {e}")
-
-
+            
+    
     # def on_ai_reply(self, chunk: ChatCompletionChunk):
     #     self.close()
-
+    
     def on_close(self):
         self.close()
-
+    
     def close(self):
-        # 防止重复关闭
-        if self.is_closing:
-            logger.info("已经在关闭过程中，跳过重复关闭")
-            return
-
-        self.is_closing = True
         logger.info("关闭麦克风")
         self.micro_phone_task = None
 
@@ -102,10 +95,9 @@ class ASRPlugin(Plugin, RecognitionCallback):
             self.recognition.stop()
         except Exception as e:
             logger.error(f"出现异常: {e}")
-
+        
         self.micro_phone_stream = None
         self.started = False
-        self.is_closing = False  # 重置关闭标志
 
     def on_event(self, result: RecognitionResult):
         sentence = result.get_sentence()
@@ -119,32 +111,26 @@ class ASRPlugin(Plugin, RecognitionCallback):
 
                 if RecognitionResult.is_sentence_end(sentence) and text.strip():    # VAD检测，说话结束
                     self.speak_end(text.strip())
-
+    
     def speak_end(self, text_result: str):
-        if self.event_loop and self.app:
+        if self.event_loop and False:   # 暂时先禁用智能体响应
             self.event_loop.create_task(
                 self.app.sync_send_message({
                     'role': 'user',
-                    'content': text_result  # 修复变量名错误
+                    'content': text
                     })
                 )
         logger.info("说话结束")
-        # 不在这里调用close()，让start_stream方法在循环中断后自动调用
-        self.started = False  # 设置为False，让start_stream循环中断
+        self.close()
         if self.speak_end_callback:
             self.speak_end_callback(text_result)
-
+    
     def on_error(self, result: RecognitionResult) -> None:
         logger.error(f"出现错误 - id: {result.request_id} - error: {result.message}")
         if self.micro_phone_stream:
-            try:
-                self.micro_phone_stream.stop_stream()
-                self.micro_phone_stream.close()
-            except Exception as e:
-                logger.error(f"关闭音频流异常: {e}")
-        self.micro_phone_stream = None
-        self.started = False
-
+            self.micro_phone_stream.close()
+        #     self.micro_phone_stream.stop_stream()
+    
     def on_app_before_initialize(self, app: Application):
         self.app = app
 
@@ -162,17 +148,16 @@ class ASRPlugin(Plugin, RecognitionCallback):
                 #     last_time = time.time()
                 # self.end_speak_time = time.time() - last_time
                 # l_time = self.end_speak_time
-                if not (self.micro_phone_task and self.micro_phone_stream): 
+                if not (self.micro_phone_task and self.micro_phone_stream): # or self.end_speak_time >= self.end_time:
                     break
                 data = self.micro_phone_stream.read(self.block_size, False)
                 self.recognition.send_audio_frame(data)
         except Exception as e:
             logger.error(f"语音识别出现异常: {e}")
 
-        # 循环结束后，清理资源
-        if not self.is_closing:  # 如果不是在关闭过程中，才调用close
+        if self.started:
+            self.started = False
             self.close()
-
         if self.ended:
             self.ended()
 
@@ -180,22 +165,23 @@ class ASRPlugin(Plugin, RecognitionCallback):
         self.event_loop = asyncio.get_event_loop()
         if self.is_open:
             self.start()
-
+    
     def emit(self, name: str, arguments: dict):
         if name == "stop":
             self.close()
         elif name == "start" and self.event_loop:
             self.start()
-
+    
     def start(self):
         if self.event_loop:
             self.micro_phone_task = self.event_loop.create_task(self.start_stream())
 
     def on_app_will_close(self, delay_request):
         self.close()
+        self.micro_phone.terminate()
 
     def bind_speak_end(self, callback: typing.Callable):
         self.speak_end_callback = callback
-
+    
     def bind_ended(self, callback: typing.Callable):
         self.ended = callback

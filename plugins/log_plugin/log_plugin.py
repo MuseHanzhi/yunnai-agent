@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 class LogPlugin(Plugin):
     def __init__(self, name: str):
         super().__init__(name, desc="TTS，在程序的某个关键时刻输出日志")
+        self.replying = False
     
     def on_app_before_initialize(self, app: "Application"):
         print("应用程序开始初始化")
@@ -32,6 +33,13 @@ class LogPlugin(Plugin):
 
     def on_background_thread_start(self):
         ...
+    
+    def on_ai_reply(self, chunk: ChatCompletionChunk):
+        if not self.replying:
+            print("智能体开始响应")
+    
+    def on_ai_reply_completed(self, finish_reason: str):
+        print("智能体响应完毕")
 
     def on_window_hide(self, window: QWidget):
         print("窗体隐藏")

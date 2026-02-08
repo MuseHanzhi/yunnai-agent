@@ -10,18 +10,17 @@ from .ui import MainWindow
 from plugins import Plugin
 from .core.plugin_manager import PluginManager
 
+logger = logging.Logger(__name__)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
+logger.addHandler(console_handler)
 
 class Application(QApplication):
     def __init__(self, argv):
         super().__init__(argv)
-        self.logger = logging.Logger(__name__)
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        )
-        self.logger.addHandler(console_handler)
-
         self.plugin_manager = PluginManager()
         self.windows: dict[str, QWidget] = {}
         self.background_thread_event_loop: None | asyncio.AbstractEventLoop = None
@@ -56,15 +55,15 @@ class Application(QApplication):
         #endregion
 
         # AIChat
-        self.logger.info("加载AIChat组件")
+        logger.info("加载AIChat组件")
         self.ai = AIChat("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus")
         self.ai.on_reply = self.on_reply
-        self.logger.info("加载AIChat组件完毕")
+        logger.info("加载AIChat组件完毕")
 
         # 应用界面
-        self.logger.info("初始化界面")
+        logger.info("初始化界面")
         self.main_window = MainWindow()
-        self.logger.info("初始化界面完毕")
+        logger.info("初始化界面完毕")
 
         # 后台线程任务
         self.background_thread = Thread(target=self.background_thread_task, args=())
@@ -76,7 +75,7 @@ class Application(QApplication):
         self.plugin_manager.add(*plugins)
 
     def app_init(self):
-        self.logger.info("初始化应用程序")
+        logger.info("初始化应用程序")
         self.plugin_manager.trigger(
             "on_app_before_initialize",
             app = self
@@ -88,10 +87,10 @@ class Application(QApplication):
 
         # 触发插件对应时机
         self.plugin_manager.trigger("on_app_after_initialized")
-        self.logger.info("初始化应用程序完毕")
+        logger.info("初始化应用程序完毕")
     
     def __init_main_window(self):
-        self.logger.info("初始化窗体")
+        logger.info("初始化窗体")
         # 连接信号等操作
         self.main_window.send_btn_clicked.connect(self.on_send_btn_clicked)
         self.main_window.show()
@@ -100,10 +99,10 @@ class Application(QApplication):
             "on_main_window_show",
             window = self.windows
             )
-        self.logger.info("初始化窗体完毕")
+        logger.info("初始化窗体完毕")
     
     def on_send_btn_clicked(self, value: str):
-        self.logger.info(f"user: {value} -> assistant")
+        logger.info(f"user: {value} -> assistant")
         if self.background_thread_event_loop:
             self.background_thread_event_loop.create_task(self.sync_send_message({
                 "role": "user",
@@ -138,7 +137,7 @@ class Application(QApplication):
             self.main_window.set_label(self.reply_text)
 
         elif not finish_reason is None:
-            self.logger.info(f"assistant {self.reply_text} -> user")
+            logger.info(f"assistant {self.reply_text} -> user")
             self.reply_text = ""
             self.plugin_manager.trigger(
                 "on_ai_reply_completed",
@@ -147,20 +146,20 @@ class Application(QApplication):
     
     def background_thread_task(self):
         threading.current_thread().name = 'background_thread'
-        self.logger.info("初始化后台线程")
+        logger.info("初始化后台线程")
 
-        self.logger.info("初始化后台线程事件循环")
+        logger.info("初始化后台线程事件循环")
         self.background_thread_event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.background_thread_event_loop)
         self.background_thread_event_loop.create_task(self.run_task())
 
         self.plugin_manager.trigger("on_background_thread_start")
 
-        self.logger.info("后台线程初始化完毕, 开启事件循环")
+        logger.info("后台线程初始化完毕, 开启事件循环")
         self.background_thread_event_loop.run_forever()
 
         self.plugin_manager.trigger("on_background_thread_end")
-        self.logger.info("后台线程退出")
+        logger.info("后台线程退出")
     
     async def run_task(self):
         main_hided = self.main_window.isHidden()
@@ -193,11 +192,11 @@ class Application(QApplication):
          return True
     
     def run(self):
-        self.logger.info("开始运行程序")
+        logger.info("开始运行程序")
         self.background_thread.start()
         self.exec()
 
         self.plugin_manager.trigger("on_app_will_close", delay_request = self.delay_close)
 
         self.background_thread.join()   # 后台线程先退出
-        self.logger.info("主线程退出")
+        logger.info("主线程退出")

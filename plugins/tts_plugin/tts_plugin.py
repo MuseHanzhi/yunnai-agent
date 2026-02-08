@@ -18,6 +18,9 @@ class TTSPlugin(Plugin):
         self.tts.on_tts_end = self.tts_end
         self.asr_plugin: Plugin | None = None
     
+    def on_app_will_close(self, delay_request):
+        return super().on_app_will_close(delay_request)
+    
     def on_app_before_initialize(self, app: "Application"):
         self.asr_plugin = app.plugin_manager["asr_plugin"]
         return super().on_app_before_initialize(app)
@@ -45,7 +48,7 @@ class TTSPlugin(Plugin):
             if words:
                 self.tts.speack_text(words)
     
-    def on_message_before_send(self, *messages: ChatCompletionMessageParam):
+    def on_message_before_send(self, session, messages):
         if self.is_start:
             self.tts.about()
             self.is_start = False
