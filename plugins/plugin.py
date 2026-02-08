@@ -1,6 +1,7 @@
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING, Iterator
 from openai.types.chat import ChatCompletionChunk,ChatCompletionMessageParam
 from PyQt6.QtWidgets import QWidget
+from src.components.ai_chat.chat_session import ChatSession
 
 if TYPE_CHECKING:
     from ..src.application import Application
@@ -51,7 +52,7 @@ class Plugin:
     def on_ai_reply_completed(self, finish_reason: str):
         ...
     
-    def on_message_before_send(self, *message: ChatCompletionMessageParam):
+    def on_message_before_send(self, session: ChatSession, messages: Iterator[ChatCompletionMessageParam]):
         """
         向智能体发送信息前触发
         

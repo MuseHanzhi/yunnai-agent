@@ -46,20 +46,27 @@ class ASRPlugin(Plugin, RecognitionCallback):
 
         self.words = ""
         self.is_open = is_open
-        self.allow_send = True
     
     def on_open(self):
-        self.logger.info(f"接收麦克风音频")
-        self.micro_phone_stream = self.micro_phone.open(
-                                                        format=pyaudio.paInt16,
-                                                        channels=self.channels,
-                                                        rate=self.sample_rate,
-                                                        input=True)
+        self.logger.info("开始语音转文字")
+        self.start_micro()
+    
+    def start_micro(self):
+        self.logger.info(f"打开麦克风")
+        if not self.micro_phone_stream:
+            self.micro_phone_stream = self.micro_phone.open(
+                                                            format=pyaudio.paInt16,
+                                                            channels=self.channels,
+                                                            rate=self.sample_rate,
+                                                            input=True)
     
     def on_ai_reply(self, chunk: ChatCompletionChunk):
-        self.stop_send()
+        self.stop()
     
     def on_close(self):
+        self.close()
+    
+    def close(self):
         self.logger.info("关闭语音识别")
         if self.micro_phone_stream:
             try:
@@ -89,13 +96,13 @@ class ASRPlugin(Plugin, RecognitionCallback):
                         )
                     self.app.main_window.set_input("")
                     self.logger.info("说话结束")
-                    self.stop_send()
+                    self.stop()
     
     def on_error(self, result: RecognitionResult) -> None:
         self.logger.error(f"出现错误 - id: {result.request_id} - error: {result.message}")
         if self.micro_phone_stream:
-            self.micro_phone_stream.stop_stream()
             self.micro_phone_stream.close()
+        #     self.micro_phone_stream.stop_stream()
     
     def on_app_before_initialize(self, app: Application):
         self.app = app
@@ -105,16 +112,14 @@ class ASRPlugin(Plugin, RecognitionCallback):
             self.logger.info(f"准备接收音频流")
             self.recognition.start()
             self.logger.info(f"开始接收音频流")
+            print(self.micro_phone_task, self.micro_phone_stream)
             while self.micro_phone_task and self.micro_phone_stream:
                 await asyncio.sleep(0.01)
-                if self.allow_send:
-                    data = self.micro_phone_stream.read(self.block_size, False)
-                    self.recognition.send_audio_frame(data)
+                data = self.micro_phone_stream.read(self.block_size, False)
+                self.recognition.send_audio_frame(data)
         except Exception as e:
             self.logger.error(f"出现异常: {e}")
-            return
         finally:
-            self.logger.info(f"准备结束接收音频流")
             self.recognition.stop()
             self.logger.info(f"结束接收音频流")
 
@@ -122,24 +127,24 @@ class ASRPlugin(Plugin, RecognitionCallback):
     def on_background_thread_start(self):
         self.event_loop = asyncio.get_event_loop()
         if self.is_open:
-            self.micro_phone_task = self.event_loop.create_task(self.start_stream())
+            self.start()
     
     def emit(self, name: str, arguments: dict):
         if name == "stop":
-            self.stop_send()
-        elif name == "continue":
-            self.continue_send()
+            self.stop()
         elif name == "start" and self.event_loop:
-            self.micro_phone_task = self.event_loop.create_task(self.start_stream())
-        return super().emit(name, arguments)
+            self.start()
     
-    def continue_send(self):
-        self.logger.info("继续发送")
-        self.allow_send = True
-
-    def stop_send(self):
-        self.logger.info("停止发送")
-        self.allow_send = False
+    def start(self):
+        if self.event_loop:
+            self.micro_phone_task = self.event_loop.create_task(self.start_stream())
+    
+    def stop(self):
+        try:
+            self.recognition.stop()
+            # self.close()
+        except Exception as e:
+            self.logger.error(f"出现异常: {e}")
 
     def on_app_will_close(self, delay_request):
         self.micro_phone_task = None

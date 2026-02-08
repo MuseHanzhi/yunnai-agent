@@ -45,11 +45,10 @@ class TTSPlugin(Plugin):
             if words:
                 self.tts.speack_text(words)
     
-    def on_message_before_send(self, *message: ChatCompletionMessageParam):
+    def on_message_before_send(self, *messages: ChatCompletionMessageParam):
         if self.is_start:
             self.tts.about()
             self.is_start = False
-        return super().on_message_before_send(*message)
     
     def emit(self, name, arguments):
         if name == "about":
@@ -57,4 +56,4 @@ class TTSPlugin(Plugin):
     
     def tts_end(self):
         if self.asr_plugin:
-            self.asr_plugin.emit("continue", {})
+            self.asr_plugin.emit("start", {})

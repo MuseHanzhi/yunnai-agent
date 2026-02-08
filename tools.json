@@ -19,7 +19,7 @@
                         },
                         "content": {
                             "type": "string",
-                            "description": "写入的内容"
+                            "description": "需要写入的内容"
                         }
                     },
                     "required": ["file_path", "content"]

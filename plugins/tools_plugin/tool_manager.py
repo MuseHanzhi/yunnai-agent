@@ -13,11 +13,11 @@ class ToolManager:
     def __init__(self):
         self.tools = []
         self.tool_func: dict[str, Callable] = {}
-        self.root_path = path.abspath(path.join("src", "tools"))
+        self.root_path = path.abspath("tools")
         self.initialize_tools()
     
     def initialize_tools(self):
-        tools_path = path.abspath(path.join('src', 'tools.json'))
+        tools_path = path.abspath("tools.json")
         tools: dict = {}
         with open(tools_path, "r", encoding="utf-8") as fs:
             tools = json.load(fs)
@@ -35,7 +35,7 @@ class ToolManager:
             temp_module_name = module_name
             if not temp_module_name.endswith('.py'):
                 temp_module_name += '.py'
-            module_path = path.join(self.root_path, "modules", temp_module_name)
+            module_path = path.join(self.root_path, temp_module_name)
 
             if not path.exists(module_path):
                 raise Exception(f"找不到模块'{module_path}'")

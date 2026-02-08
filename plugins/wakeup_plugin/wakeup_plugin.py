@@ -10,7 +10,13 @@ if typing.TYPE_CHECKING:
     from src.application import Application
 
 class WakeupPlugin(Plugin):
-    def __init__(self, name: str, keyword_paths: list[str], lang='zh', wakeup_word = "") -> None:
+    def __init__(self,
+                 name: str,
+                 keyword_paths: list[str],
+                 lang='zh',
+                 text = "",
+                 callback: None | typing.Callable = None
+                 ) -> None:
         super().__init__(name, desc="唤醒词检测")
         access_key = os.environ.get("PORCUPINE_ACCESSKEY")
         if not access_key:
@@ -37,18 +43,25 @@ class WakeupPlugin(Plugin):
         if not os.path.exists(model_path):
             raise Exception("模型文件不存在")
 
-        self.wakeup_word = wakeup_word
-        self.porcupine = pvporcupine.create(
-            access_key=access_key,
-            keyword_paths=temp_keyword_paths,
-            model_path=model_path
-        )
-
-        self.recorder = PvRecorder(frame_length=self.porcupine.frame_length)
+        self.text = text
+        self.access_key = access_key
+        self.keyword_paths = temp_keyword_paths
+        self.model_path = model_path
+        self.porcupine: pvporcupine.Porcupine | None = None
+        self.recorder: None | PvRecorder = None
 
         self.listen_task: None | asyncio.Task = None
         self.app: "None | Application" = None
         self.event_loop: asyncio.AbstractEventLoop | None = None
+        self.on_detect = callback
+    
+    def init(self):
+        self.porcupine = pvporcupine.create(
+            access_key=self.access_key,
+            keyword_paths=self.keyword_paths,
+            model_path=self.model_path
+        )
+        PvRecorder(frame_length=self.porcupine.frame_length)
 
     def on_app_before_initialize(self, app: "Application"):
         self.app = app
@@ -58,8 +71,12 @@ class WakeupPlugin(Plugin):
         self.listen_task = self.event_loop.create_task(self.start_listen())
     
     async def start_listen(self):
+        self.init()
+        if not (self.recorder and self.porcupine):
+            self.logger.warning("麦克风或唤醒词模型未准备")
+            return
+        
         self.logger.info("开始唤醒词检测")
-        self.recorder.start()
         while self.listen_task and self.recorder.is_recording:
             try:
                 pcm = self.recorder.read()
@@ -73,39 +90,39 @@ class WakeupPlugin(Plugin):
                 self.logger.error(f"出现异常: {e}")
 
     def detect_handler(self):
+        if self.on_detect:
+            self.on_detect()
         if not self.event_loop:
             self.logger.warning("没有事件循环实例")
             return
         if not self.app:
             self.logger.warning("没有主程序实例")
+            return
+        
+        self.deinit()
+
+        if self.text:
+            self.event_loop.create_task(
+                self.app.sync_send_message({
+                    "role": "user",
+                    "content": self.text
+                })
+            )
+    
+    def deinit(self):
+        if self.porcupine and self.recorder:
             if self.recorder.is_recording:
                 self.recorder.stop()
             self.recorder.delete()
             self.porcupine.delete()
-            return
-        asr = self.app.plugin_manager.get_plugin('asr_plugin')
-        if asr:
-            asr.emit('start', {})
-            return
-        self.logger.warning("获取不到ASR插件")
-
-        if self.wakeup_word:
-            self.event_loop.create_task(
-                self.app.sync_send_message({
-                    "role": "user",
-                    "content": self.wakeup_word
-                })
-            )
+            self.porcupine = None
+            self.recorder = None
     
     def on_app_will_close(self, delay_request):
-        if self.recorder.is_recording:
-            self.recorder.stop()
-        self.recorder.delete()
-        self.porcupine.delete()
+        self.deinit()
     
     def emit(self, name: str, arguments: dict):
         if name == "stop":
-            self.recorder.stop()
-            self.listen_task = None
+            self.deinit()
         elif name == "start" and self.event_loop:
             self.listen_task = self.event_loop.create_task(self.start_listen())

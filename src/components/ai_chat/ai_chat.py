@@ -1,56 +1,44 @@
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam, ChatCompletionChunk
-from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToolUnionParam
+from openai.types.chat import ChatCompletionChunk
 import os
-import json
+from .chat_session import ChatSession
 
 class AIChat:
 
-    def __init__(self, system_prompt=""):
+    def __init__(self, base_url: str, model_name: str):
         self.__client = OpenAI(
             api_key= os.getenv('DASHSCOPE_API_KEY'),
-            base_url= 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+            base_url= base_url
         )
 
-        self.__tools: list[ChatCompletionToolUnionParam] = []
-        self.__messages: list[ChatCompletionMessageParam] = []
-        if system_prompt:
-            self.__messages.append({
-                'role': 'system',
-                'content': system_prompt
-            })
-
+        self.model = model_name
     
-    def add_tool(self, tool: ChatCompletionToolUnionParam):
-        self.__tools.append(tool)
+    def create_session(self):
+        session = ChatSession(self)
+        return session
     
-    def set_tools(self, tools: list[ChatCompletionToolUnionParam]):
-        self.__tools = tools
-    
-    def send(self, *messages: ChatCompletionMessageParam):
-        for message in messages:
-            self.__messages.append(message)
-        self.__create_chat()
-    
-    def __create_chat(self):
-        params = {
-            "model": "qwen-plus",
-            "messages": self.__messages,
+    def get_model_params(self):
+        return {
+            "model": self.model,
+            "messages": [],
             "stream": True,
-            "extra_body": {
-                "enable_search": True
-            }
         }
 
-        if len(self.__tools) > 0:
-            params['tools'] = self.__tools
+    
+    def start_response(self, session: ChatSession):
+        params = self.get_model_params()
+
+        params["messages"] = session.messages
+        if len(session.tools) > 0:
+            params["tools"] = session.tools
+        
+        if len(session.extra_body) > 0:
+            params["extra_body"] = session.extra_body
 
         completion = self.__client.chat.completions.create(**params)
 
-
         # 处理流式回复
         for chunk in completion:
-            print("replying...")
             self.on_reply(chunk, None)
         self.on_reply(None, chunk.choices[0].finish_reason)
     

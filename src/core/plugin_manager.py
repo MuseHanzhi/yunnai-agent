@@ -51,7 +51,7 @@ class PluginManager(MutableMapping[str, Plugin]):
     def get_plugin(self, name: str) -> None | Plugin:
         return self.plugins.get(name)
 
-    def emit(self, plugin_name: str, name: str, arguments: dict):
+    def emit(self, plugin_name: str, name: str, arguments: dict = {}):
         plugin = self.plugins.get(plugin_name)
         if plugin is None:
             raise Exception(f"没有名为 '{plugin_name}' 的插件")

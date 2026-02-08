@@ -1,19 +1,20 @@
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
+
+from src.components.ai_chat.chat_session import ChatSession
 # from PyQt6.QtWidgets import QMessageBox
-from src.tools import ToolManager
-from typing import TYPE_CHECKING
+from .tool_manager import ToolManager
+from typing import TYPE_CHECKING, Iterator, Callable
 # from PyQt6.QtCore import QSize
 from plugins import Plugin
 import logging
 import asyncio
-import typing
 import json
 
 if TYPE_CHECKING:
     from src.application import Application
 
 class ToolsPlugin(Plugin):
-    def __init__(self, name: str, inner_tool: dict[str, typing.Callable] = {}, inner_flag: str = "application"):
+    def __init__(self, name: str, inner_tool: dict[str, Callable] = {}, inner_flag: str = "application"):
         super().__init__(name, desc="TTS，给予智能体调用工具的能力")
         self.logger = logging.Logger(__name__)
         console_handler = logging.StreamHandler()
@@ -35,10 +36,11 @@ class ToolsPlugin(Plugin):
         self.inner_tools = inner_tool
         self.event_loop: asyncio.AbstractEventLoop | None = None
         
+    def on_message_before_send(self, session: ChatSession, messages):
+        session.add_tools(*self.tools_manager.get_tools_schema())
     
     def on_app_before_initialize(self, app: "Application"):
         self.application = app
-        app.ai.set_tools(self.tools_manager.get_tools_schema())
     
     def on_background_thread_start(self):
         self.event_loop = asyncio.get_event_loop()

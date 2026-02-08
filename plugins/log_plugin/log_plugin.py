@@ -1,6 +1,7 @@
-from typing import Any, Callable, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING, Iterator
 from PyQt6.QtWidgets import QWidget
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
+from src.components.ai_chat.chat_session import ChatSession
 from plugins import Plugin
 import json
 
@@ -23,10 +24,10 @@ class LogPlugin(Plugin):
     def on_app_closed(self):
         print("应用程序已关闭")
     
-    def on_message_before_send(self, *messages: ChatCompletionMessageParam):
-        print(f"发送消息: {messages}")
+    def on_message_before_send(self, session: ChatSession, messages):
+        print("消息开始发送")
     
-    def on_message_before_sended(self):
+    def on_message_after_sended(self):
         print("消息已发送")
 
     def on_background_thread_start(self):

@@ -32,24 +32,35 @@ def set_plugin_state(name: str, state: bool):
 
 def idle():
     try:
-        main_app.plugin_manager.emit("asr_plugin", "stop", {})
-        main_app.plugin_manager.emit("wakeup_plugin", "start", {})
+        main_app.plugin_manager.emit("asr_plugin", "stop")
+        main_app.plugin_manager.emit("wakeup_plugin", "start")
     except:
         ...
     return {
         "message": "OK"
         }
 
-    
 
-def main():
+def wakeup_handler():
+    main_app.plugin_manager.emit("asr_plugin", "start")
+
+def setup_plugins():
+    wakeup = WakeupPlugin(
+        "wakeup_plugin",
+        ["wakeup_models/nihao-yunnai_zh_windows_v4_0_0.ppn"],
+        text="",
+        callback=wakeup_handler)
+    
     main_app.add_plugin(
+        # wakeup,
         LogPlugin("log_plugin"),
         ToolsPlugin("tools_plugin", inner_tool=inner_tools),
-        TTSPlugin("tts_plugin"),
-        ASRPlugin("asr_plugin", False),
-        WakeupPlugin("wakeup_plugin", ["wakeup_models/nihao-yunnai_zh_windows_v4_0_0.ppn"], wakeup_word="你好云乃"),
-    )
+        # TTSPlugin("tts_plugin"),
+        # ASRPlugin("asr_plugin", False)
+        )
+
+def main():
+    setup_plugins()
     main_app.app_init()
     main_app.run()
 

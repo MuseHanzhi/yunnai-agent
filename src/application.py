@@ -6,7 +6,6 @@ import asyncio
 import logging
 
 from .components.ai_chat import AIChat
-from .tools import ToolManager
 from .ui import MainWindow
 from plugins import Plugin
 from .core.plugin_manager import PluginManager
@@ -58,7 +57,7 @@ class Application(QApplication):
 
         # AIChat
         self.logger.info("加载AIChat组件")
-        self.ai = AIChat("你的名字叫**云乃**是用户的好朋友  **调用任何工具之前需要说明理由**而且说话要简短，口语化表达，**道别时调用'application.idle'**")
+        self.ai = AIChat("https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus")
         self.ai.on_reply = self.on_reply
         self.logger.info("加载AIChat组件完毕")
 
@@ -86,9 +85,6 @@ class Application(QApplication):
         self.applicationStateChanged.connect(self.on_application_changed_handle)
         
         self.__init_main_window()   # 初始化窗体
-        
-        self.tool_manager = ToolManager()
-        self.ai.set_tools(self.tool_manager.get_tools_schema())
 
         # 触发插件对应时机
         self.plugin_manager.trigger("on_app_after_initialized")
@@ -185,8 +181,10 @@ class Application(QApplication):
         self.send_message(*messages)
     
     def send_message(self, *messages: ChatCompletionMessageParam):
-        self.plugin_manager.trigger("on_message_before_send")
-        self.ai.send(*messages)
+        session = self.ai.create_session()
+        session.add_messages(*messages)
+        self.plugin_manager.trigger("on_message_before_send", session=session, messages=messages)
+        self.ai.start_response(session)
         self.plugin_manager.trigger("on_message_after_sended")
     
     def delay_close(self, seconds: int):

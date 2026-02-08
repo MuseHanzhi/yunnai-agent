@@ -4,7 +4,7 @@ from pvrecorder import PvRecorder
 def main():
     # 创建Porcupine实例 - 需要替换为你的access_key
     porcupine = pvporcupine.create(
-        access_key='As0zjidTMkdjx/ahD+oEj37N7l2quLcl7nL54+rgF/3G+ZEF0CybPA==',  # 替换为你的Access Key
+        access_key='[access_key]',  # 替换为你的Access Key
         keyword_paths=['wakeup_models/nihao-yunnai_zh_windows_v4_0_0.ppn'],
         model_path="wakeup_models/porcupine_params_zh.pv"
     )
