@@ -1,0 +1,34 @@
+{
+    "logging":{
+        "default": "info",
+        "handlers": {
+            "info": [
+                {
+                    "type": "console",
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                },
+                {
+                    "type": "file",
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                }
+            ],
+            "debug": [
+                {
+                    "type": "file",
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                }
+            ],
+            "error": [
+                {
+                    "type": "console",
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                },
+                {
+                    "type": "file",
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                }
+            ]
+        },
+        "filters": []
+    }
+}

@@ -1,0 +1,19 @@
+// 客户端就绪
+{
+    type: "event",
+    name: "client_ready",
+    timestamp: 0,
+    arguments: {
+        config: {
+            api_key: "xxxx",
+            bae_url: "xxxx"
+        },
+        envs: {
+            lang: "zh",
+            device: "xxx",
+            network: "xxx",
+            cpu: "xxx",
+            timezone: "Asia/Shanghai"
+        }
+    }
+}

@@ -1,12 +1,11 @@
 from plugins import (
-    LogPlugin,
     ToolsPlugin,
     TTSPlugin,
     ASRPlugin,
     WakeupPlugin
 )
+from src.components.logger import logger as log
 from src.application import Application
-import logging
 import sys
 
 def get_plugin_list():
@@ -21,7 +20,7 @@ def get_plugin_list():
 def set_plugin_state(name: str, state: bool):
     try:
         main_app.plugin_manager.set_plugin_state(name, state)
-        logging.info("已打开" if state else "已关闭")
+        logger.info("已打开" if state else "已关闭")
         return {
             "message": "已打开" if state else "已关闭"
         }
@@ -51,7 +50,7 @@ def speak_end(_text: str):
     try:
         wakeup_plugin.emit("start", {})
     except Exception as e:
-        logging.error(f"出现错误: {e}")
+        logger.error(f"出现错误: {e}")
 
 def asr_ended():
     speak_end("")
@@ -71,9 +70,8 @@ def setup_plugins():
     main_app.add_plugin(
         wakeup_plugin,
         asr_plugin,
-        LogPlugin("log_plugin"),
         ToolsPlugin("tools_plugin", inner_tool=inner_tools),
-        TTSPlugin("tts_plugin"),
+        TTSPlugin("tts_plugin")
         )
 
 def main():
@@ -81,6 +79,7 @@ def main():
     main_app.app_init()
     main_app.run()
 
+logger = log.create(__name__)
 wakeup_plugin: WakeupPlugin
 asr_plugin: ASRPlugin
 main_app = Application(sys.argv)
@@ -89,9 +88,7 @@ inner_tools = {
     "set_plugin_state": set_plugin_state,
     "idle": idle
 }
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 
 if __name__ == '__main__':
     main()
+    # test()

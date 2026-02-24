@@ -19,7 +19,7 @@ class TTSPlugin(Plugin):
         self.asr_plugin: Plugin | None = None
     
     def on_app_will_close(self, delay_request):
-        return super().on_app_will_close(delay_request)
+        self.tts.abort()
     
     def on_app_before_initialize(self, app: "Application"):
         self.asr_plugin = app.plugin_manager["asr_plugin"]
@@ -33,7 +33,7 @@ class TTSPlugin(Plugin):
     
     def on_ai_reply(self, chunk: ChatCompletionChunk):
         if chunk.id and self.current_id != chunk.id:
-            self.tts.about()
+            self.tts.abort()
             self.current_id = chunk.id
 
         content = chunk.choices[0].delta.content
@@ -50,12 +50,12 @@ class TTSPlugin(Plugin):
     
     def on_message_before_send(self, session, messages):
         if self.is_start:
-            self.tts.about()
+            self.tts.abort()
             self.is_start = False
     
     def emit(self, name, arguments):
         if name == "about":
-            self.tts.about()
+            self.tts.abort()
     
     def tts_end(self):
         if self.asr_plugin:

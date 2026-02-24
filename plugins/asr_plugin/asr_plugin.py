@@ -4,14 +4,15 @@ from dashscope.audio.asr import (
     Recognition
 )
 from openai.types.chat import ChatCompletionChunk
-from src.application import Application
 from plugins import Plugin
 from pyaudio import PyAudio
 import asyncio
 import pyaudio
-import logging
 import typing
 import time
+
+from src.application import Application
+from src.components.logger import logger as log
 
 if typing.TYPE_CHECKING:
     from src.application import Application
@@ -19,13 +20,7 @@ if typing.TYPE_CHECKING:
 
 
 #region 初始化日志输出
-logger = logging.Logger(__name__)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    )
-logger.addHandler(console_handler)
+logger = log.create(__name__)
 #endregion
 
 class ASRPlugin(Plugin, RecognitionCallback):
@@ -44,7 +39,7 @@ class ASRPlugin(Plugin, RecognitionCallback):
         self.end_speak_time = 0
         self.end_time = end_time / 1000
         self.started = False
-        self.is_closing = False  # 添加关闭标志，防止重复关闭
+        self.is_closing = False
 
         self.micro_phone = PyAudio()
         self.micro_phone_stream: pyaudio._Stream | None = None
@@ -112,12 +107,12 @@ class ASRPlugin(Plugin, RecognitionCallback):
         if 'text' in sentence:
             if isinstance(sentence, dict) and self.app:
                 text: str = sentence.get('text', "")
-                self.app.main_window.set_input(text)
 
                 logger.info(f"mic -> {text}")
                 self.end_speak_time = 0
 
                 if RecognitionResult.is_sentence_end(sentence) and text.strip():    # VAD检测，说话结束
+                    self.close()
                     self.speak_end(text.strip())
 
     def speak_end(self, text_result: str):

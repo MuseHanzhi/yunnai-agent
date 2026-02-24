@@ -1,7 +1,8 @@
 {
     "meta": {
         "modules": [
-            "file"
+            "file",
+            "music"
         ]
     },
     "tools": [
@@ -114,8 +115,33 @@
             "type": "function",
             "function": {
                 "name": "application.idle",
-                "description": "闲置，用户告别的时候调用",
+                "description": "",
                 "parameters": {}
+            }
+        },
+        {
+            "type":"function",
+            "function": {
+                "name": "music.get_list_from_user_music",
+                "description": "获取音乐列表",
+                "parameters": {}
+            }
+        },
+        {
+            "type":"function",
+            "function": {
+                "name": "music.play_music",
+                "description": "使用系统默认播放器播放音乐",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {
+                            "type": "string",
+                            "description": "音乐文件名"
+                        }
+                    },
+                    "required": ["filename"]
+                }
             }
         }
     ]

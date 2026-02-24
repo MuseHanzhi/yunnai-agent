@@ -68,7 +68,7 @@ class TTSService:
     def set_event_loop(self, event_loop: asyncio.AbstractEventLoop):
         self.__event_loop = event_loop
     
-    def about(self):
+    def abort(self):
         if self.__speacker:
             try:
                 self.__speacker.streaming_complete()

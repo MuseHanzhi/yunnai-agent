@@ -1,28 +1,21 @@
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
-
-from src.components.ai_chat.chat_session import ChatSession
-# from PyQt6.QtWidgets import QMessageBox
-from .tool_manager import ToolManager
-from typing import TYPE_CHECKING, Iterator, Callable
-# from PyQt6.QtCore import QSize
-from plugins import Plugin
-import logging
+from typing import TYPE_CHECKING, Callable
 import asyncio
 import json
+
+from src.components.logger import logger as log
+from src.core.ai_chat.chat_session import ChatSession
+from .tool_manager import ToolManager
+from plugins import Plugin
 
 if TYPE_CHECKING:
     from src.application import Application
 
+logger = log.create(__name__)
+
 class ToolsPlugin(Plugin):
     def __init__(self, name: str, inner_tool: dict[str, Callable] = {}, inner_flag: str = "application"):
         super().__init__(name, desc="TTS，给予智能体调用工具的能力")
-        self.logger = logging.Logger(__name__)
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        )
-        self.logger.addHandler(console_handler)
 
         self.inner_flag = inner_flag
         self.tools_manager = ToolManager()
@@ -79,25 +72,9 @@ class ToolsPlugin(Plugin):
             'arguments': ''
         }
 
-        # dialog = QMessageBox()
-        # dialog.setFixedSize(QSize(400, 200))
-        # dialog.setWindowTitle(f"提示")
-        # dialog.setText(f"是否助手允许调用'{name}'工具？\n参数信息：{arguments}")
-
-        # dialog.setStandardButtons(
-        #     QMessageBox.StandardButton.Yes |
-        #     QMessageBox.StandardButton.No
-        # )
-
-        # res = dialog.exec()
-        # result = QMessageBox.StandardButton(res)
         messages = self.allow_call(id, name, arguments)
         if self.event_loop:
             self.event_loop.create_task(self.send_message(*messages))
-        # if result == QMessageBox.StandardButton.No:  # 拒绝调用处理
-        #     self.reject_call(id, name, arguments)
-        # else:   # 允许调用工具
-        #     self.allow_call(id, name, arguments)
     
     async def send_message(self, *messages: ChatCompletionMessageParam):
         if not self.application:
@@ -130,7 +107,7 @@ class ToolsPlugin(Plugin):
         ]
     
     def allow_call(self, id: str, name: str, arguments: str) -> list[ChatCompletionMessageParam]:
-        self.logger.info(f"调用工具: '{name}'，参数: {arguments}，id: {id}")
+        logger.info(f"调用工具: '{name}'，参数: {arguments}，id: {id}")
         names = name.split('.')
         call_result = None
         if names[0] != self.inner_flag:

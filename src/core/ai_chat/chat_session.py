@@ -1,13 +1,9 @@
 from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToolUnionParam
 from openai.types.chat import ChatCompletionMessageParam
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from .ai_chat import AIChat
+from typing import Any
 
 class ChatSession:
-    def __init__(self, chat: "AIChat", messages: list[ChatCompletionMessageParam] = [], tools: list[ChatCompletionToolUnionParam] = []):
-        self.chat = chat
+    def __init__(self, messages: list[ChatCompletionMessageParam] = [], tools: list[ChatCompletionToolUnionParam] = []):
         self.messages = messages
         self.tools = tools
         self.extra_body: dict[str, Any] = {}

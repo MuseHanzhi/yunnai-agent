@@ -1,11 +1,9 @@
-from typing import Callable, TYPE_CHECKING, Iterator
+from typing import TYPE_CHECKING, Iterator
 from openai.types.chat import ChatCompletionChunk,ChatCompletionMessageParam
-from PyQt6.QtWidgets import QWidget
-from src.components.ai_chat.chat_session import ChatSession
+from src.core.ai_chat.chat_session import ChatSession
 
 if TYPE_CHECKING:
     from ..src.application import Application
-    from ..src.ui import MainWindow
 
 class Plugin:
     def __str__(self) -> str:
@@ -73,7 +71,7 @@ class Plugin:
     def on_background_thread_end(self):
         ...
     
-    def on_app_will_close(self, delay_request: Callable):
+    def on_app_will_close(self):
         """
         向智能体发送信息前触发
         
@@ -83,18 +81,18 @@ class Plugin:
         """
         ...
     
-    def on_window_hide(self, window: QWidget):
+    def on_window_hide(self, window):
         ...
     
-    def on_window_minimize(self, window: QWidget):
+    def on_window_minimize(self, window):
         ...
     
-    def on_window_maximize(self, window: QWidget):
+    def on_window_maximize(self, window):
         ...
     
-    def on_main_window_show(self, window: "MainWindow"):
+    def on_main_window_show(self, window):
         ...
-    
+
     def emit(self, name: str, arguments: dict):
         """
         用于插件与插件之间的通信
