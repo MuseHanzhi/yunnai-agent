@@ -35,10 +35,10 @@ class ToolsPlugin(Plugin):
     def on_app_before_initialize(self, app: "Application"):
         self.application = app
     
-    def on_background_thread_start(self):
+    def on_ready(self):
         self.event_loop = asyncio.get_event_loop()
     
-    def on_ai_reply(self, chunk: ChatCompletionChunk):
+    def on_model_response(self, chunk: ChatCompletionChunk):
         data = chunk.choices[0].model_dump()
         delta = data['delta']
         tool = delta.get("tool_calls", None)
@@ -58,7 +58,7 @@ class ToolsPlugin(Plugin):
             self.tool_info["name"] += function_name if function_name else ''
             self.tool_info["arguments"] += arguments if arguments else ''
     
-    def on_ai_reply_completed(self, finish_reason):
+    def on_model_response_completed(self, finish_reason):
         if not self.application or finish_reason == "stop":
             return
         

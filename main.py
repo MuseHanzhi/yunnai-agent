@@ -1,54 +1,25 @@
+import sys
+import os
+
+from src.application_tools import application_tools
+from src.components.logger import logger as log
+from src.application import Application
 from plugins import (
     ToolsPlugin,
     TTSPlugin,
     ASRPlugin,
     WakeupPlugin
 )
-from src.components.logger import logger as log
-from src.application import Application
-import sys
-
-def get_plugin_list():
-    plugins = []
-    for _, plugin in main_app.plugin_manager.plugins.items():
-        plugins.append(str(plugin))
-    return {
-        "message": "OK",
-        "datas": plugins
-    }
-
-def set_plugin_state(name: str, state: bool):
-    try:
-        main_app.plugin_manager.set_plugin_state(name, state)
-        logger.info("已打开" if state else "已关闭")
-        return {
-            "message": "已打开" if state else "已关闭"
-        }
-    except Exception as e:
-        return {
-            "message": e
-        }
-
-def idle():
-    try:
-        asr_plugin.emit("stop", {})
-        wakeup_plugin.emit("start", {})
-    except:
-        ...
-    return {
-        "message": "OK"
-        }
-
 
 def wakeup_handler():
     try:
-        asr_plugin.emit("start", {})
+        main_app.plugin_manager.emit("wakeup_plugin", "start")
     except:
         ...
 
 def speak_end(_text: str):
     try:
-        wakeup_plugin.emit("start", {})
+        main_app.plugin_manager.emit("wakeup_plugin", "start")
     except Exception as e:
         logger.error(f"出现错误: {e}")
 
@@ -74,19 +45,44 @@ def setup_plugins():
         TTSPlugin("tts_plugin")
         )
 
+def env_check():
+    """
+    环境检查
+    - 检查环境变量
+    """
+    result = True
+
+    logger.info("开始进行环境检查")
+    ali_key = os.getenv("DASHSCOPE_API_KEY")
+    if not ali_key:
+        result = False
+        logger.warning("请配置环境变量'DASHSCOPE_API_KEY'")
+    logger.info("'DASHSCOPE_API_KEY'===OK")
+
+    por_key = os.getenv("PORCUPINE_ACCESSKEY")
+    if not por_key:
+        result = False
+        logger.warning("请配置环境变量'PORCUPINE_ACCESSKEY'")
+    logger.info("'PORCUPINE_ACCESSKEY'===OK")
+
+    return result
+
+
 def main():
+    if not env_check():
+        sys.exit(1)
     setup_plugins()
     main_app.app_init()
-    main_app.run()
+    sys.exit(main_app.run())
 
 logger = log.create(__name__)
 wakeup_plugin: WakeupPlugin
 asr_plugin: ASRPlugin
 main_app = Application(sys.argv)
 inner_tools = {
-    "plugin_list": get_plugin_list,
-    "set_plugin_state": set_plugin_state,
-    "idle": idle
+    "plugin_list": application_tools.get_plugin_list,
+    "set_plugin_state": application_tools.set_plugin_state,
+    "idle": application_tools.idle
 }
 
 if __name__ == '__main__':

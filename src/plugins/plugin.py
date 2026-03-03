@@ -3,15 +3,14 @@ from openai.types.chat import ChatCompletionChunk,ChatCompletionMessageParam
 from src.core.ai_chat.chat_session import ChatSession
 
 if TYPE_CHECKING:
-    from ..src.application import Application
+    from src.application import Application
 
 class Plugin:
     def __str__(self) -> str:
-        return f"<plguin: {self.name}, author: {self.author}, ver: {self.version}, desc: {self.desc}, state: {self.state}>"
+        return f"<plguin: {self.name}, ver: {self.version}, desc: {self.desc}, state: {self.state}>"
 
-    def __init__(self, name: str, author: str = "", version: str = "1.0", desc: str = ""):
+    def __init__(self, name: str, version: str = "1.0", desc: str = ""):
         self.name = name
-        self.author = author
         self.version = version
         self.desc = desc
         self.state = True
@@ -28,7 +27,6 @@ class Plugin:
         
         :param self: 插件实例
         :param app: 主程序实例
-        :type app: Application
         """
         ...
     
@@ -38,17 +36,19 @@ class Plugin:
         """
         ...
     
-    def on_ai_reply(self, chunk: ChatCompletionChunk):
+    def on_model_response(self, chunk: ChatCompletionChunk):
         """
-        智能体回复时触发
+        大模型响应时触发
         
         :param content: 回复内容（流式）
         :type content: ChatCompletionChunk
         """
         ...
     
-    def on_ai_reply_completed(self, finish_reason: str):
-        ...
+    def on_model_response_completed(self, finish_reason: str):
+        """
+        大模型响应完毕
+        """
     
     def on_message_before_send(self, session: ChatSession, messages: Iterator[ChatCompletionMessageParam]):
         """
@@ -65,10 +65,10 @@ class Plugin:
         """
         ...
 
-    def on_background_thread_start(self):
-        ...
-    
-    def on_background_thread_end(self):
+    def on_ready(self):
+        """
+        程序就绪时触发
+        """
         ...
     
     def on_app_will_close(self):
@@ -81,6 +81,8 @@ class Plugin:
         """
         ...
     
+
+    # region 窗口状态Hooks
     def on_window_hide(self, window):
         ...
     
@@ -90,8 +92,9 @@ class Plugin:
     def on_window_maximize(self, window):
         ...
     
-    def on_main_window_show(self, window):
+    def on_window_show(self, window):
         ...
+    # endregion
 
     def emit(self, name: str, arguments: dict):
         """

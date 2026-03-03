@@ -1,6 +1,23 @@
 from typing import MutableMapping
 from plugins import Plugin
 import logging
+from typing import Literal
+
+
+Timing = Literal[
+    "on_app_before_initialize",
+    "on_app_after_initialized",
+    "on_model_response",
+    "on_model_response_completed",
+    "on_app_will_close",
+    "on_message_before_send",
+    "on_message_after_sended",
+    "on_ready",
+    "on_window_hide",
+    "on_window_minimize",
+    "on_window_maximize",
+    "on_window_show"
+]
 
 class PluginManager(MutableMapping[str, Plugin]):
     def __delitem__(self, key: str) -> None:
@@ -58,47 +75,47 @@ class PluginManager(MutableMapping[str, Plugin]):
         plugin.emit(name, arguments)
 
 
-    def trigger(self, timming: str, **arguments):
-        for _, plugin in self.plugins.items():
-            if not plugin.state:
-                continue
-            if timming == "on_app_before_initialize":   # 应用初始化前
-                plugin.on_app_before_initialize(**arguments)
-                continue
-            if timming == "on_app_after_initialized":   # 应用初始化后
-                plugin.on_app_after_initialized()
-                continue
-            if timming == "on_ai_reply":                # 智能体回复
-                plugin.on_ai_reply(**arguments)
-                continue
-            if timming == "on_ai_reply_completed":      # 智能体回复完毕
-                plugin.on_ai_reply_completed(**arguments)
-                continue
-            if timming == "on_app_will_close":          # 应用将关闭
-                plugin.on_app_will_close()
-                continue
-            if timming == "on_message_before_send":     # 信息发送前
-                plugin.on_message_before_send(**arguments)
-                continue
-            if timming == "on_message_after_sended":    # 信息发送后
-                plugin.on_message_after_sended()
-                continue
-            if timming == "on_background_thread_start": # 后台线程启动前
-                plugin.on_background_thread_start(**arguments)
-                continue
-            if timming == "on_background_thread_end":   # 后台线程结束
-                plugin.on_background_thread_end()
-                continue
-            if timming == "on_window_hide":             # 窗体隐藏/关闭
-                plugin.on_window_hide(**arguments)
-                continue
-            if timming == "on_window_minimize":         # 窗体最小化
-                plugin.on_window_minimize(**arguments)
-                continue
-            if timming == "on_window_maximize":         # 窗体最大化
-                plugin.on_window_maximize(**arguments)
-                continue
-            if  timming == "on_main_window_show":       # 窗体显示/打开
-                plugin.on_main_window_show(**arguments)
+    def trigger(self, timming: Timing, **arguments):
+        try:
+            for _, plugin in self.plugins.items():
+                if not plugin.state:
+                    continue
+                if timming == "on_app_before_initialize":   # 应用初始化前
+                    plugin.on_app_before_initialize(**arguments)
+                    continue
+                if timming == "on_app_after_initialized":   # 应用初始化后
+                    plugin.on_app_after_initialized()
+                    continue
+                if timming == "on_model_response":                # 智能体回复
+                    plugin.on_model_response(**arguments)
+                    continue
+                if timming == "on_model_response_completed":      # 智能体回复完毕
+                    plugin.on_model_response_completed(**arguments)
+                    continue
+                if timming == "on_app_will_close":          # 应用将关闭
+                    plugin.on_app_will_close()
+                    continue
+                if timming == "on_message_before_send":     # 信息发送前
+                    plugin.on_message_before_send(**arguments)
+                    continue
+                if timming == "on_message_after_sended":    # 信息发送后
+                    plugin.on_message_after_sended()
+                    continue
+                if timming == "on_ready": # 程序准备完毕
+                    plugin.on_ready(**arguments)
+                    continue
+                if timming == "on_window_hide":             # 窗体隐藏/关闭
+                    plugin.on_window_hide(**arguments)
+                    continue
+                if timming == "on_window_minimize":         # 窗体最小化
+                    plugin.on_window_minimize(**arguments)
+                    continue
+                if timming == "on_window_maximize":         # 窗体最大化
+                    plugin.on_window_maximize(**arguments)
+                    continue
+                if  timming == "on_window_show":       # 窗体显示/打开
+                    plugin.on_window_show(**arguments)
+        except Exception as err:
+            raise err
 
 

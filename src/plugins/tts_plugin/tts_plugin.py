@@ -25,13 +25,13 @@ class TTSPlugin(Plugin):
         self.asr_plugin = app.plugin_manager["asr_plugin"]
         return super().on_app_before_initialize(app)
     
-    def on_background_thread_start(self):
+    def on_ready(self):
         self.tts.set_event_loop(asyncio.get_event_loop())
     
-    def on_ai_reply_completed(self, finish_reason: str):
+    def on_model_response_completed(self, finish_reason: str):
         self.current_id = ""
     
-    def on_ai_reply(self, chunk: ChatCompletionChunk):
+    def on_model_response(self, chunk: ChatCompletionChunk):
         if chunk.id and self.current_id != chunk.id:
             self.tts.abort()
             self.current_id = chunk.id

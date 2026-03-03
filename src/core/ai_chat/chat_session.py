@@ -3,10 +3,11 @@ from openai.types.chat import ChatCompletionMessageParam
 from typing import Any
 
 class ChatSession:
-    def __init__(self, messages: list[ChatCompletionMessageParam] = [], tools: list[ChatCompletionToolUnionParam] = []):
+    def __init__(self, model_name: str, messages: list[ChatCompletionMessageParam] = [], tools: list[ChatCompletionToolUnionParam] = []):
         self.messages = messages
         self.tools = tools
         self.extra_body: dict[str, Any] = {}
+        self.model_name = model_name
     
     def set_prompt(self, prompt_text):
         self.messages.append({

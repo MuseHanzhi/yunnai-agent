@@ -71,7 +71,7 @@ class WakeupPlugin(Plugin):
     def on_app_before_initialize(self, app: "Application"):
         self.app = app
 
-    def on_background_thread_start(self):
+    def on_ready(self):
         self.event_loop = asyncio.get_event_loop()
         self.listen_task = self.event_loop.create_task(self.start_listen())
 
