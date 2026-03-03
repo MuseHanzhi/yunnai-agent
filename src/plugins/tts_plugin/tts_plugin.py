@@ -1,6 +1,6 @@
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 from src.application import Application
-from plugins import Plugin
+from src.plugins import Plugin
 from .tts.tts_service import TTSService
 import asyncio
 import typing

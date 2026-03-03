@@ -1,10 +1,12 @@
+from dotenv import load_dotenv
 import sys
 import os
 
+from src.plugins.plugin import Plugin
 from src.application_tools import application_tools
 from src.components.logger import logger as log
 from src.application import Application
-from plugins import (
+from src.plugins import (
     ToolsPlugin,
     TTSPlugin,
     ASRPlugin,
@@ -26,7 +28,7 @@ def speak_end(_text: str):
 def asr_ended():
     speak_end("")
 
-def setup_plugins():
+def setup_plugins() -> list[Plugin]:
     global wakeup_plugin, asr_plugin
     wakeup_plugin = WakeupPlugin(
         "wakeup_plugin",
@@ -38,12 +40,12 @@ def setup_plugins():
     asr_plugin.bind_speak_end(speak_end)
     asr_plugin.bind_ended(asr_ended)
     
-    main_app.add_plugin(
+    return [
         wakeup_plugin,
         asr_plugin,
         ToolsPlugin("tools_plugin", inner_tool=inner_tools),
         TTSPlugin("tts_plugin")
-        )
+    ]
 
 def env_check():
     """
@@ -71,10 +73,11 @@ def env_check():
 def main():
     if not env_check():
         sys.exit(1)
-    setup_plugins()
-    main_app.app_init()
+
+    main_app.app_init(setup_plugins())
     sys.exit(main_app.run())
 
+load_dotenv()
 logger = log.create(__name__)
 wakeup_plugin: WakeupPlugin
 asr_plugin: ASRPlugin

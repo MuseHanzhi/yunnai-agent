@@ -6,7 +6,7 @@ import json
 from src.components.logger import logger as log
 from src.core.ai_chat.chat_session import ChatSession
 from .tool_manager import ToolManager
-from plugins import Plugin
+from src.plugins import Plugin
 
 if TYPE_CHECKING:
     from src.application import Application
@@ -77,9 +77,9 @@ class ToolsPlugin(Plugin):
             self.event_loop.create_task(self.send_message(*messages))
     
     async def send_message(self, *messages: ChatCompletionMessageParam):
-        if not self.application:
+        if not self.application or not self.event_loop:
             return
-        self.application.send_message(*messages)
+        self.event_loop.create_task(self.application.sync_send_message(None, *messages))
         await asyncio.sleep(0.01)
 
     

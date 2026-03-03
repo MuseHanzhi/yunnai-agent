@@ -1,5 +1,5 @@
 from typing import MutableMapping
-from plugins import Plugin
+from src.plugins import Plugin
 import logging
 from typing import Literal
 

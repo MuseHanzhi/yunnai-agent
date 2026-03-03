@@ -4,7 +4,7 @@ from dashscope.audio.asr import (
     Recognition
 )
 from openai.types.chat import ChatCompletionChunk
-from plugins import Plugin
+from src.plugins import Plugin
 from pyaudio import PyAudio
 import asyncio
 import pyaudio

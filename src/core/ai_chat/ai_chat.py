@@ -1,17 +1,20 @@
 import os
 from openai import OpenAI
 from openai.types.chat import ChatCompletionChunk
+from typing import Callable
 
 from .types import EnvOptions, ServiceConfig
 from .chat_session import ChatSession
 
+response_handler = Callable[[ChatCompletionChunk | None, str | None], None]
 class AIChat:
     def __init__(self, service_config: ServiceConfig, envs: EnvOptions = {}):
+        api_key = service_config.get('api_key')
+        api_key = api_key if api_key else os.getenv("DASHSCOPE_API_KEY")
         self._client: OpenAI = OpenAI(
-            api_key= os.getenv("DASHSCOPE_API_KEY"),
+            api_key= api_key,
             base_url= service_config["base_url"]
         )
-        self.model = service_config["model_name"]
         self.envs: EnvOptions = envs
         self.label_map = {
             "lang": "系统语言",
@@ -19,7 +22,13 @@ class AIChat:
             "network": "网络类型",
             "cpu": "CPU"
         }
-
+        self.response_hook: response_handler | None = None
+    
+    def init(self, service_config: ServiceConfig):
+        api_key = service_config.get('api_key')
+        if api_key:
+            self._client.api_key = api_key
+        self._client.base_url = service_config['base_url']
     
     def _env_string(self):
         envs: list[str] = []
@@ -31,8 +40,8 @@ class AIChat:
 
         return "\n".join(envs)
     
-    def create_session(self):
-        session = ChatSession(self.model, [], [])
+    def create_session(self, model_name: str):
+        session = ChatSession(model_name, [], [])
         if self.envs:
             sys_prompt_for_envs = f"""
 # 用户系统环境
@@ -69,11 +78,11 @@ class AIChat:
 
         # 处理流式回复
         for chunk in completion:
-            self.on_reply(chunk, None)
-        self.on_reply(None, chunk.choices[0].finish_reason)
+            if self.response_hook:
+                self.response_hook(chunk, None)
+        
+        if self.response_hook:
+            self.response_hook(None, chunk.choices[0].finish_reason)
     
-    def on_reply(self, chunk: ChatCompletionChunk | None, finish_reason: str | None):
-        """
-        AI流式回复信息时触发
-        """
-        ...
+    def bind_response_handler(self, hook: response_handler):
+        self.response_hook = hook

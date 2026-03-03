@@ -1,4 +1,4 @@
-from plugins import Plugin
+from src.plugins import Plugin
 import typing
 import pvporcupine
 from pvrecorder import PvRecorder
