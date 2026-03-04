@@ -11,7 +11,7 @@ from src.core.plugin_manager import PluginManager
 from src.components.logger import logger as log
 from src.core.ipc.ipc import IPCServer
 from src.plugins import Plugin
-from src.types.message import MessageOptions
+from src.components.ipc_handlers.ipc_handler import IPCHandler
 
 logger = log.create(__name__)
 class Application:
@@ -35,8 +35,9 @@ class Application:
         logger.info("加载AIChat组件完毕")
 
         self.ui_process = UIProcess()
-
         self.ipc = IPCServer()
+
+        self.ipc_handler = IPCHandler(self)
 
         self._running = False
         self.reply_text = ""
@@ -48,12 +49,17 @@ class Application:
     
     def close(self, params: dict):
         self._running = False
-        if self.event_loop:
-            self.event_loop.stop()
+        event_loop = asyncio.get_event_loop()
+        if event_loop:
+            event_loop.stop()
             # self.event_loop.close())
 
     def app_init(self, plugins: list[Plugin] = []):
         logger.info("初始化应用程序")
+
+        # 异步事件循环
+        event_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(event_loop)
 
         self.plugin_manager.add(*plugins)
 
@@ -61,12 +67,6 @@ class Application:
             "on_app_before_initialize",
             app = self
             )
-        
-        # 初始化IPC通信
-        self.ipc.handle("get-plugins", self.get_plugins)
-        self.ipc.handle("set-plugin", self.set_plugin)
-        self.ipc.on('send-msg', self.send_msg)
-        self.ipc.on('client-ready', self._client_ready)
 
         self.ai.bind_response_handler(self.on_response)
 
@@ -74,41 +74,8 @@ class Application:
         self.plugin_manager.trigger("on_app_after_initialized")
         logger.info("初始化应用程序完毕")
     
-    def _client_ready(self, params: dict):
-        # self._init_ai_chat(params)
-        ...
-    
-    def send_msg(self, params: Any):
-        message: MessageOptions = params
-        text: str | None = message["data"]["text"]
-        
-        model_name = message["options"]["model_name"]
-
-        if self.event_loop and message:
-            c = self.sync_send_message(model_name, { 'role': 'user', 'content': text })
-            self.event_loop.create_task(c)
-    
-    def set_plugin(self, params: dict):
-        name: str = params.get("name", "")
-        state: bool = params.get("state", False)
-        try:
-            self.plugin_manager.set_plugin_state(name, state)
-            return True
-        except ValueError as err:
-            raise err
-    
-    def get_plugins(self, params: dict):
-        plugins: list[dict] = []
-        for n, p in self.plugin_manager.plugins.items():
-            plugins.append({
-                "name": n,
-                "desc": p.desc,
-                "version": p.version,
-                "state": p.state
-            })
-        return plugins
-    
     def on_response(self, chunk: ChatCompletionChunk | None, finish_reason: str | None):
+        event_loop = asyncio.get_event_loop()
         if chunk and finish_reason is None:
             self.plugin_manager.trigger(
                 "on_model_response",
@@ -120,38 +87,33 @@ class Application:
                 return
             
             self.reply_text += content
-            if self.event_loop:
-                try:
-                    self.event_loop.create_task(self.ipc.emit("ai-response", message = content)).result()
-                except:
-                    ...
+            try:
+                event_loop.create_task(self.ipc.emit("ai-response", message = content)).result()
+            except:
+                ...
 
         elif not finish_reason is None:
             self.reply_text = ""
-            if self.event_loop:
-                self.event_loop.create_task(self.ipc.emit("ai-response-completed"))
+            event_loop.create_task(self.ipc.emit("ai-response-completed"))
             self.plugin_manager.trigger(
                 "on_model_response_completed",
                 finish_reason = finish_reason
             )
     
     def _run(self):
-        logger.info("初始化事件循环")
-        self.event_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.event_loop)
-
         # IPC 服务端
         ipc_host = os.getenv('IPC_HOST')
         ipc_port = os.getenv('IPC_PORT')
         if ipc_host and ipc_port:
             self.ipc.config_server(ipc_host, int(ipc_port))
-        self.event_loop.create_task(self.ipc.start(self.event_loop))
+        
+        event_loop = asyncio.get_event_loop()
+        event_loop.create_task(self.ipc.start())
 
         self.plugin_manager.trigger("on_ready")
 
         # 启动UI进程
         ui_command: str | None = os.getenv('UI_COMMAND')
-
         if ui_command:
             logger.info("启动UI线程")
             cwd: str | None = os.getenv('UI_CWD')
@@ -160,7 +122,7 @@ class Application:
             self.ui_process.start("yunnai-ui", ui_command, str(path), int(ui_process_port) if ui_process_port else None)
 
         logger.info("开启事件循环")
-        self.event_loop.run_forever()
+        event_loop.run_forever()
     
     async def sync_send_message(self, model_name: str | None = None, *messages: ChatCompletionMessageParam):
         await asyncio.sleep(0.01)

@@ -113,7 +113,7 @@ class ASRPlugin(Plugin, RecognitionCallback):
     def speak_end(self, text_result: str):
         if self.event_loop and self.app:
             self.event_loop.create_task(
-                self.app.sync_send_message({
+                self.app.sync_send_message(None, {
                     'role': 'user',
                     'content': text_result  # 修复变量名错误
                     })

@@ -324,11 +324,10 @@ class IPCServer:
                 timer.cancel()
             raise
 
-    async def start(self, event_loop: asyncio.AbstractEventLoop | None = None):
+    async def start(self):
         """启动 IPC 服务器"""
-        if event_loop is None:
-            event_loop = asyncio.get_event_loop()
-            
+        event_loop = asyncio.get_event_loop()
+        
         logger.info(f"IPC 服务器启动: ws://{self.websocket_server.host}:{self.websocket_server.port}")
         await self.websocket_server.start(event_loop)
 
