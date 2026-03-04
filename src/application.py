@@ -30,7 +30,7 @@ class Application:
         # AIChat
         logger.info("加载AIChat组件")
         self.ai = AIChat({
-            "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            "base_url": os.getenv("LLM_URL", "")
         })
         logger.info("加载AIChat组件完毕")
 
@@ -150,11 +150,14 @@ class Application:
         self.plugin_manager.trigger("on_ready")
 
         # 启动UI进程
-        cwd: str | None = os.getenv('UI_CWD')
-        ui_command: str | None = os.getenv('UI_COMMAND')        
-        path = pathlib.Path(os.getcwd(), cwd if cwd else ".")
+        ui_command: str | None = os.getenv('UI_COMMAND')
 
-        self.ui_process.start("yunnai-ui", ui_command, str(path))
+        if ui_command:
+            logger.info("启动UI线程")
+            cwd: str | None = os.getenv('UI_CWD')
+            ui_process_port: str | None = os.getenv('UI_PORT')
+            path = pathlib.Path(os.getcwd(), cwd if cwd else ".")
+            self.ui_process.start("yunnai-ui", ui_command, str(path), int(ui_process_port) if ui_process_port else None)
 
         logger.info("开启事件循环")
         self.event_loop.run_forever()

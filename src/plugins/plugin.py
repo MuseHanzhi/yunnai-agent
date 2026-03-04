@@ -76,25 +76,8 @@ class Plugin:
         向智能体发送信息前触发
         
         :param self: 插件实例
-        :param delay_request: 请求延时关闭，每次请求不能超过2秒 delay_request(2)
-        :type delay_request: Callable
         """
         ...
-    
-
-    # region 窗口状态Hooks
-    def on_window_hide(self, window):
-        ...
-    
-    def on_window_minimize(self, window):
-        ...
-    
-    def on_window_maximize(self, window):
-        ...
-    
-    def on_window_show(self, window):
-        ...
-    # endregion
 
     def emit(self, name: str, arguments: dict):
         """

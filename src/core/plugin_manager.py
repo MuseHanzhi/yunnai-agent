@@ -104,17 +104,17 @@ class PluginManager(MutableMapping[str, Plugin]):
                 if timming == "on_ready": # 程序准备完毕
                     plugin.on_ready(**arguments)
                     continue
-                if timming == "on_window_hide":             # 窗体隐藏/关闭
-                    plugin.on_window_hide(**arguments)
-                    continue
-                if timming == "on_window_minimize":         # 窗体最小化
-                    plugin.on_window_minimize(**arguments)
-                    continue
-                if timming == "on_window_maximize":         # 窗体最大化
-                    plugin.on_window_maximize(**arguments)
-                    continue
-                if  timming == "on_window_show":       # 窗体显示/打开
-                    plugin.on_window_show(**arguments)
+                # if timming == "on_window_hide":             # 窗体隐藏/关闭
+                #     plugin.on_window_hide(**arguments)
+                #     continue
+                # if timming == "on_window_minimize":         # 窗体最小化
+                #     plugin.on_window_minimize(**arguments)
+                #     continue
+                # if timming == "on_window_maximize":         # 窗体最大化
+                #     plugin.on_window_maximize(**arguments)
+                #     continue
+                # if  timming == "on_window_show":       # 窗体显示/打开
+                #     plugin.on_window_show(**arguments)
         except Exception as err:
             raise err
 

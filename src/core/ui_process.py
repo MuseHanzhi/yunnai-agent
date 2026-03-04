@@ -1,22 +1,27 @@
 import subprocess
 import time
 import socket
+import shutil
+import os
 
-from src.core.ipc.ipc import IPCServer
 from src.components.logger import logger as log
 
 logger = log.create(__name__)
 
-def is_port_open(port, host='127.0.0.1'):
+def is_port_open(port, host='localhost'):
     """检查端口是否已被占用（防止重复启动）"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex((host, port)) == 0
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex((host, port)) == 0
+    except Exception as ex:
+        logger.error(f"检查端口出错: {ex}")
 
 class UIProcess:
     def __init__(self):
         self.processes = {}  # 存 {name: Popen对象}
+        self.cmd_white_list = ["pnpm tauri dev"]
     
-    def start(self, name, cmd, cwd=None, port=None, env=None):
+    def start(self, name, cmd: str, cwd: str | None = None, port: int | None=None, env=None):
         """
         启动 UI 服务
         :param name: 服务标识（如 "sovits_ui", "llm_api"）
@@ -27,15 +32,32 @@ class UIProcess:
         if port and is_port_open(port):
             raise RuntimeError(f"端口 {port} 已被占用，{name} 可能已在运行")
         
+        if cwd and not os.path.exists(cwd):
+            raise Exception(f"工作路径'{cwd}'不存在")
+        
+        if cmd not in self.cmd_white_list:
+            raise Exception(f"'{cmd}' 不在白名单内")
+
         # 启动子进程，非阻塞
-        proc = subprocess.Popen(
-            cmd,
-            cwd=cwd,
-            env=env,
-            stdout=subprocess.PIPE,      # 可选：捕获或丢弃
-            stderr=subprocess.STDOUT,    # 合并错误输出
-            start_new_session=True       # Linux/Mac：脱离终端会话，防止 SIGHUP
-        )
+
+        proc: subprocess.Popen
+        try:
+            logger.info(f"execute: {cmd}")
+            proc = subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                env=env,
+                stdout=subprocess.PIPE,      # 可选：捕获或丢弃
+                stderr=subprocess.STDOUT,    # 合并错误输出
+                start_new_session=True,       # Linux/Mac：脱离终端会话，防止 SIGHUP
+                shell=True
+            )
+        except Exception as ex:
+            logger.error(f"出现异常: {ex}")
+            return None
+
+        if proc.stderr:
+            logger.info(f"命令输出: \n{proc.stderr.read()}")
         
         self.processes[name] = {
             'proc': proc,
