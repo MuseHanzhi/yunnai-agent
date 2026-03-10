@@ -55,9 +55,6 @@ class UIProcess:
         except Exception as ex:
             logger.error(f"出现异常: {ex}")
             return None
-
-        if proc.stderr:
-            logger.info(f"命令输出: \n{proc.stderr.read()}")
         
         self.processes[name] = {
             'proc': proc,
