@@ -82,7 +82,7 @@ UI_PORT=5173
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/MuseHanzhi/yunnai-agent.git
 cd yunnai-agent
 ```
 
