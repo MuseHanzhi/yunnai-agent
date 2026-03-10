@@ -34,25 +34,20 @@ class Application:
         })
         logger.info("加载AIChat组件完毕")
 
-        self.ui_process = UIProcess()
+        # self.ui_process = UIProcess()
         self.ipc = IPCServer()
 
         self.ipc_handler = IPCHandler(self)
 
-        self._running = False
         self.reply_text = ""
-        self.llm_model = "qwen-plus"
+        self.llm_model = os.getenv("LLM_MODEL", "")
+        self.is_ready = False
     
-    def env_check(self):
-        # 环境检查
-        ...
-    
-    def close(self, params: dict):
-        self._running = False
+    def close(self):
         event_loop = asyncio.get_event_loop()
         if event_loop:
             event_loop.stop()
-            # self.event_loop.close())
+            # event_loop.close()
 
     def app_init(self, plugins: list[Plugin] = []):
         logger.info("初始化应用程序")
@@ -61,6 +56,7 @@ class Application:
         event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(event_loop)
 
+        self.ipc_handler.init()
         self.plugin_manager.add(*plugins)
 
         self.plugin_manager.trigger(
@@ -109,17 +105,17 @@ class Application:
         
         event_loop = asyncio.get_event_loop()
         event_loop.create_task(self.ipc.start())
-
+        event_loop.create_task(self.ipc.emit("ready"))
         self.plugin_manager.trigger("on_ready")
 
         # 启动UI进程
-        ui_command: str | None = os.getenv('UI_COMMAND')
-        if ui_command:
-            logger.info("启动UI线程")
-            cwd: str | None = os.getenv('UI_CWD')
-            ui_process_port: str | None = os.getenv('UI_PORT')
-            path = pathlib.Path(os.getcwd(), cwd if cwd else ".")
-            self.ui_process.start("yunnai-ui", ui_command, str(path), int(ui_process_port) if ui_process_port else None)
+        # ui_command: str | None = os.getenv('UI_COMMAND')
+        # if ui_command:
+        #     logger.info("启动UI线程")
+        #     cwd: str | None = os.getenv('UI_CWD')
+        #     ui_process_port: str | None = os.getenv('UI_PORT')
+        #     path = pathlib.Path(os.getcwd(), cwd if cwd else ".")
+        #     self.ui_process.start("yunnai-ui", ui_command, str(path), int(ui_process_port) if ui_process_port else None)
 
         logger.info("开启事件循环")
         event_loop.run_forever()

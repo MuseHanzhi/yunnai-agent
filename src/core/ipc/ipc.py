@@ -124,7 +124,7 @@ class IPCServer:
         handler = self.invoke_handlers.get(invoke_name)
         
         if not handler:
-            result_data['exceptMessage'] = f"NoHandler: '{invoke_name}' 未注册"
+            result_data['exceptMessage'] = f"NoHandler: '{invoke_name}' 该invokeIPC服务端未注册"
             await self._send(result_data)
             return
         

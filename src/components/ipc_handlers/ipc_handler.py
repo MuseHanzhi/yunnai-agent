@@ -18,10 +18,16 @@ class IPCHandler:
     def init(self):
         self.ipc.handle("get-plugins", self.get_plugins)
         self.ipc.handle("set-plugin", self.set_plugin)
+        self.ipc.handle("ready", self.ready_handler)
+
         self.ipc.on('send-msg', self.send_msg)
         self.ipc.on('client-ready', self._client_ready)
+        self.ipc.on('close-app', self.close_app)
 
         self.event_loop = asyncio.get_event_loop()
+    
+    def close_app(self, params: dict):
+        self.app.close()
     
     def _client_ready(self, params: dict):
         # self._init_ai_chat(params)
@@ -45,6 +51,9 @@ class IPCHandler:
             return True
         except ValueError as err:
             raise err
+    
+    def ready_handler(self, params: dict):
+        return self.app.is_ready
     
     def get_plugins(self, params: dict):
         plugins: list[dict] = []
