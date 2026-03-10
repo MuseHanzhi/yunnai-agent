@@ -1,4 +1,4 @@
-# 云奈智能助手 (Yunnai Agent)
+# 云乃智能助手 (Yunnai Agent)
 
 一个基于大语言模型的智能桌面助手应用，支持语音唤醒、语音识别、文本转语音等功能。
 
@@ -82,7 +82,7 @@ UI_PORT=5173
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/MuseHanzhi/yunnai-agent.git
 cd yunnai-agent
 ```
 
