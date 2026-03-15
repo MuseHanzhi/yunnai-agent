@@ -1,5 +1,5 @@
 import websockets
-from typing import Callable, Any, Optional
+from typing import Callable, Any, Optional, TypedDict
 import asyncio
 import json
 import time
@@ -10,10 +10,14 @@ import src.components.logger as log
 
 logger = log.create(__name__)
 
+class InvokeSession(TypedDict):
+    future: asyncio.Future
+    timer: asyncio.TimerHandle
+
 
 class IPCServer:
     def __init__(self, host: str = "localhost", port: int = 8866):
-        self.websocket_server = WebSocketServer(host, port, interval=500)
+        self.websocket_server = WebSocketServer(host, port)
         
         # 事件处理器: name -> list[handler]
         self.event_handlers: dict[str, list[Callable[[dict], None]]] = {}
@@ -21,7 +25,7 @@ class IPCServer:
         # Invoke 处理器: name -> handler (服务端提供的能力)
         self.invoke_handlers: dict[str, Callable[[dict[str, Any]], Any]] = {}
         
-        self.pending_invokes: dict[str, dict] = {}
+        self.invoke_sessions: dict[str, InvokeSession] = {}
         
         # Invoke 超时时间(毫秒)
         self.invoke_timeout = 30000
@@ -34,23 +38,23 @@ class IPCServer:
         self.websocket_server.host = host
         self.websocket_server.port = port
     
-    def _unactive_handler(self):
-        logger.warning("清理了不活跃的客户端连接")
+    def _unactive_handler(self, id: str):
+        logger.warning(f"清理了不活跃的客户端连接: '{id}'")
 
     def _setup_handlers(self):
         """设置 WebSocket 服务器的事件处理器"""
         self.websocket_server.bind_message_event(self._handle_message)
         self.websocket_server.bind_close_event(self._handle_close)
-        self.websocket_server.bind_heart_timeout(self._unactive_handler)
+        self.websocket_server.bind_died_timeout(self._unactive_handler)
         
         # 注册内置的 ping 处理器，自动响应心跳
-        self.on("ping", self._handle_ping)
+        self.handle("ping", self._handle_ping)
 
     def _handle_ping(self, data: dict):
         """处理心跳，自动回复 pong"""
-        _ = self.emit("pong", timestamp=time.time() * 1000)
+        return "pong"
 
-    def _handle_message(self, message: websockets.Data):
+    def _handle_message(self, id: str, message: websockets.Data):
         """处理接收到的消息"""
         try:
             # 解析消息
@@ -74,7 +78,7 @@ class IPCServer:
                     **data,
                     'arguments': data.get('arguments', {})
                 }
-                asyncio.create_task(self._handle_invoke_request(ipc_command))
+                asyncio.create_task(self._handle_invoke_request(id, ipc_command))
                 
             elif msg_type == 'invoke-res':
                 # 客户端响应服务端的 invoke 请求
@@ -107,7 +111,7 @@ class IPCServer:
         else:
             logger.debug(f"未注册的事件: {event_name}")
 
-    async def _handle_invoke_request(self, data: IPCCommand):
+    async def _handle_invoke_request(self, id: str, data: IPCCommand):
         """处理客户端的 invoke 请求 (客户端 -> 服务端)"""
         invoke_name: str = data.get('name', "")
         invoke_id: str = data.get("id", "")
@@ -125,7 +129,7 @@ class IPCServer:
         
         if not handler:
             result_data['exceptMessage'] = f"NoHandler: '{invoke_name}' 该invokeIPC服务端未注册"
-            await self._send(result_data)
+            await self._send(result_data, id)
             return
         
         try:
@@ -142,43 +146,50 @@ class IPCServer:
             logger.error(f"Invoke 处理器执行失败 ({invoke_name}): {e}", exc_info=True)
             result_data['exceptMessage'] = str(e)
         
-        await self._send(result_data)
+        await self._send(result_data, id)
 
     def _handle_invoke_response(self, data: IPCInvokeResult):
         """处理客户端对服务端 invoke 的响应"""
         invoke_name = data.get('name')
-        if not invoke_name or invoke_name not in self.pending_invokes:
+        if not invoke_name or invoke_name not in self.invoke_sessions:
             logger.warning(f"收到未知的 invoke 响应: {invoke_name}")
             return
         
-        pending = self.pending_invokes.pop(invoke_name)
+        session = self.invoke_sessions.pop(invoke_name)
         
         # 清除超时定时器
-        if 'timer' in pending:
-            pending['timer'].cancel()
+        if 'timer' in session:
+            session['timer'].cancel()
         
         except_msg = data.get('exceptMessage')
+        future = session['future']
         if except_msg:
-            pending['reject'](Exception(except_msg))
+            future.set_exception(Exception(except_msg))
         else:
-            pending['resolve'](data.get('data'))
+            future.set_result(data.get('data'))
+        
 
-    def _handle_close(self):
+    def _handle_close(self, id: str):
         """处理连接关闭"""
-        logger.info("客户端断开连接")
+        logger.info(f"客户端'{id}'断开连接")
         # 清理所有待处理的 invoke
-        for pending in list(self.pending_invokes.values()):
-            if 'timer' in pending:
-                pending['timer'].cancel()
-            pending['reject'](Exception("连接已关闭"))
-        self.pending_invokes.clear()
+        for session in list(self.invoke_sessions.values()):
+            if 'timer' in session:
+                session['timer'].cancel()
+            session['future'].set_exception(Exception("连接已关闭"))
+        self.invoke_sessions.clear()
 
-    async def _send(self, data: IPCData):
-        """发送数据到客户端"""
+    async def _send(self, data: IPCData, id: str | None = None):
+        """
+        发送数据到客户端
+        Args:
+            name: 需要发送的数据
+            id: 指定客户端，空为广播模式
+        """
         try:
-            await self.websocket_server.send(json.dumps(data, ensure_ascii=False))
+            await self.websocket_server.send(json.dumps(data, ensure_ascii=False), True, id)
         except Exception as e:
-            logger.error(f"发送消息失败: {e}")
+            logger.error(f"客户端'{id}'，发送消息失败: {e}")
             raise
 
     # ==================== 公共 API ====================
@@ -233,10 +244,11 @@ class IPCServer:
         self.invoke_handlers.pop(name, None)
         return self
 
-    async def emit(self, name: str, **arguments):
+    async def emit(self, id: str | None, name: str, **arguments):
         """发送事件到客户端 (单向通信)
         
         Args:
+            id: 客户端Id，空则为广播模式
             name: 事件名称
             **arguments: 事件参数
         """
@@ -249,15 +261,12 @@ class IPCServer:
             'type': 'event',
             'arguments': arguments
         }
-        await self._send(command)
+        await self._send(command, id)
 
-    async def invoke(self, name: str, **arguments) -> Any:
+    async def invoke(self, id: str, name: str, **arguments) -> Any:
         """调用客户端方法并等待响应 (请求/响应模式)
-        
-        每个 invoke 请求都有唯一ID，支持同时存在多个同名的 invoke 请求。
-        每个请求都会独立处理，互不影响。
-        
         Args:
+            id: 客户端ID
             name: 方法名称
             **arguments: 调用参数
             
@@ -279,11 +288,11 @@ class IPCServer:
 
         invoke_id: str = f"{time.time()}:{name}:{self.invoke_num}"
 
-        if invoke_id in self.pending_invokes:
-            old_pending = self.pending_invokes.pop(invoke_id)
-            if 'timer' in old_pending:
-                old_pending['timer'].cancel()
-            old_pending['reject'](Exception("被新的同名 invoke 覆盖"))
+        if invoke_id in self.invoke_sessions:
+            old_session = self.invoke_sessions.pop(invoke_id)
+            if 'timer' in old_session:
+                old_session['timer'].cancel()
+            old_session['future'].set_exception(Exception("被新的同名 invoke 覆盖"))
 
         command: IPCCommand = {
             'id': invoke_id,
@@ -297,8 +306,8 @@ class IPCServer:
         future = loop.create_future()
         
         def timeout_handler():
-            if invoke_id in self.pending_invokes:
-                self.pending_invokes.pop(invoke_id)
+            if invoke_id in self.invoke_sessions:
+                self.invoke_sessions.pop(invoke_id)
                 if not future.done():
                     future.set_exception(TimeoutError(f"Invoke '{invoke_id}' 超时"))
         
@@ -308,42 +317,39 @@ class IPCServer:
             timeout_handler
         )
         
-        self.pending_invokes[invoke_id] = {
-            'resolve': lambda x: future.set_result(x) if not future.done() else None,
-            'reject': lambda x: future.set_exception(x) if not future.done() else None,
-            'timer': timer
+        self.invoke_sessions[invoke_id] = {
+            'timer': timer,
+            'future': future
         }
         
         try:
-            await self._send(command)
+            await self._send(command, id)
             return await future
         except Exception:
             # 发送失败时清理
-            if invoke_id in self.pending_invokes:
-                self.pending_invokes.pop(invoke_id)
+            if invoke_id in self.invoke_sessions:
+                self.invoke_sessions.pop(invoke_id)
                 timer.cancel()
             raise
 
     async def start(self):
         """启动 IPC 服务器"""
-        event_loop = asyncio.get_event_loop()
-        
         logger.info(f"IPC 服务器启动: ws://{self.websocket_server.host}:{self.websocket_server.port}")
-        await self.websocket_server.start(event_loop)
+        await self.websocket_server.start()
 
-    async def close(self, code: int = 1000, reason: str = ""):
+    async def close(self):
         """关闭服务器"""
         # 拒绝所有待处理的 invoke
-        for pending in list(self.pending_invokes.values()):
-            if 'timer' in pending:
-                pending['timer'].cancel()
-            pending['reject'](Exception("服务器关闭"))
-        self.pending_invokes.clear()
+        for session in list(self.invoke_sessions.values()):
+            if 'timer' in session:
+                session['timer'].cancel()
+            session['future'].set_exception(Exception("服务器关闭"))
+        self.invoke_sessions.clear()
         
-        await self.websocket_server.close(code, reason)
+        await self.websocket_server.close()
         logger.info("IPC 服务器已关闭")
 
     @property
     def is_connected(self) -> bool:
         """检查是否有客户端连接"""
-        return self.websocket_server._client is not None
+        return bool(self.websocket_server._clients)

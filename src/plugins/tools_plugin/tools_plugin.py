@@ -36,6 +36,7 @@ class ToolsPlugin(Plugin):
         self.application = app
     
     def on_ready(self):
+        print(self.tools_manager.get_tools_schema())
         self.event_loop = asyncio.get_event_loop()
     
     def on_model_response(self, chunk: ChatCompletionChunk):

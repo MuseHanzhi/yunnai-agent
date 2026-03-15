@@ -1,7 +1,7 @@
 from typing import MutableMapping
 from src.plugins import Plugin
-import logging
 from typing import Literal
+import src.components.logger.logger as log
 
 
 Timing = Literal[
@@ -12,12 +12,10 @@ Timing = Literal[
     "on_app_will_close",
     "on_message_before_send",
     "on_message_after_sended",
-    "on_ready",
-    "on_window_hide",
-    "on_window_minimize",
-    "on_window_maximize",
-    "on_window_show"
+    "on_ready"
 ]
+
+logger = log.create(__name__)
 
 class PluginManager(MutableMapping[str, Plugin]):
     def __delitem__(self, key: str) -> None:
@@ -42,13 +40,14 @@ class PluginManager(MutableMapping[str, Plugin]):
         for (name, plugin) in self.plugins.items():
             try:
                 plugin.init()
+                logger.info(f"'{name}' 已就绪")
             except Exception as e:
-                logging.warning(f"插件 '{name}' 初始化出现异常: {e}")
+                logger.warning(f"插件 '{name}' 初始化出现异常: {e}")
 
     def add(self, *plugins: Plugin):
         for plugin in plugins:
             if plugin.name in self.plugins:
-                logging.warning(f"插件 '{plugin.name}' 被覆盖")
+                logger.warning(f"插件 '{plugin.name}' 被覆盖")
             self.plugins[plugin.name] = plugin
     
     def remove(self, plugin: str | Plugin):
@@ -104,17 +103,6 @@ class PluginManager(MutableMapping[str, Plugin]):
                 if timming == "on_ready": # 程序准备完毕
                     plugin.on_ready(**arguments)
                     continue
-                # if timming == "on_window_hide":             # 窗体隐藏/关闭
-                #     plugin.on_window_hide(**arguments)
-                #     continue
-                # if timming == "on_window_minimize":         # 窗体最小化
-                #     plugin.on_window_minimize(**arguments)
-                #     continue
-                # if timming == "on_window_maximize":         # 窗体最大化
-                #     plugin.on_window_maximize(**arguments)
-                #     continue
-                # if  timming == "on_window_show":       # 窗体显示/打开
-                #     plugin.on_window_show(**arguments)
         except Exception as err:
             raise err
 

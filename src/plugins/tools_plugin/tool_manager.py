@@ -14,9 +14,9 @@ class ToolManager:
         self.tools = []
         self.tool_func: dict[str, Callable] = {}
         self.root_path = path.abspath("tools")
-        self.initialize_tools()
+        self._initialize_tools()
     
-    def initialize_tools(self):
+    def _initialize_tools(self):
         tools_path = path.abspath("tools.json")
         tools: dict = {}
         with open(tools_path, "r", encoding="utf-8") as fs:
@@ -25,12 +25,17 @@ class ToolManager:
         meta = tools.get('meta')
         if not meta:
             raise Exception("工具元数据为空！")
-        self.tools = tools.get('tools', [])
-
+        
         modules = meta.get('modules', [])
-        self.__init_modules(modules)
+        self.tools = [tool for tool in tools.get('tools', []) if str(tool['function']['name']).split('.')[0] in modules]
+        self._init_modules(modules)
     
-    def __init_modules(self, modules: list[str]):
+    def reload(self):
+        self.tool_func = {}
+        self.tools = []
+        self._initialize_tools()
+    
+    def _init_modules(self, modules: list[str]):
         for module_name in modules:
             temp_module_name = module_name
             if not temp_module_name.endswith('.py'):
@@ -53,7 +58,7 @@ class ToolManager:
     def call(self, name: str, args: dict):
         if len(name.split('.')) != 2:
             return {
-                "message": "请严格按照 'module.tool_name' 的格式调用工具",
+                "message": "请严格按照 'module.function' 的格式调用工具",
                 "data": None
             }
         

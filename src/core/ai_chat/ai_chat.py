@@ -1,7 +1,8 @@
-import os
-from openai import OpenAI
 from openai.types.chat import ChatCompletionChunk
 from typing import Callable
+from openai import OpenAI
+import sys
+import os
 
 from .types import EnvOptions, ServiceConfig
 from .chat_session import ChatSession
@@ -24,6 +25,9 @@ class AIChat:
         }
         self.response_hook: response_handler | None = None
     
+    def _get_user_env(self):
+        ...
+
     def init(self, service_config: ServiceConfig):
         api_key = service_config.get('api_key')
         if api_key:

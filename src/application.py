@@ -21,11 +21,10 @@ class Application:
     - 事件循环管理
     - 触发Hook插件
     - ipc服务端
-    - UI进程
     - LLM管理
     - 插件管理
     """
-    def __init__(self, argv):
+    def __init__(self, args):
         self.plugin_manager = PluginManager()
         # AIChat
         logger.info("加载AIChat组件")
@@ -58,6 +57,7 @@ class Application:
 
         self.ipc_handler.init()
         self.plugin_manager.add(*plugins)
+        self.plugin_manager.init()
 
         self.plugin_manager.trigger(
             "on_app_before_initialize",
@@ -84,13 +84,13 @@ class Application:
             
             self.reply_text += content
             try:
-                event_loop.create_task(self.ipc.emit("ai-response", message = content)).result()
+                event_loop.create_task(self.ipc.emit(None, "ai-response", message = content)).result()
             except:
                 ...
 
         elif not finish_reason is None:
             self.reply_text = ""
-            event_loop.create_task(self.ipc.emit("ai-response-completed"))
+            event_loop.create_task(self.ipc.emit(None, "ai-response-completed"))
             self.plugin_manager.trigger(
                 "on_model_response_completed",
                 finish_reason = finish_reason
@@ -105,17 +105,8 @@ class Application:
         
         event_loop = asyncio.get_event_loop()
         event_loop.create_task(self.ipc.start())
-        event_loop.create_task(self.ipc.emit("ready"))
+        event_loop.create_task(self.ipc.emit(None, "ready"))
         self.plugin_manager.trigger("on_ready")
-
-        # 启动UI进程
-        # ui_command: str | None = os.getenv('UI_COMMAND')
-        # if ui_command:
-        #     logger.info("启动UI线程")
-        #     cwd: str | None = os.getenv('UI_CWD')
-        #     ui_process_port: str | None = os.getenv('UI_PORT')
-        #     path = pathlib.Path(os.getcwd(), cwd if cwd else ".")
-        #     self.ui_process.start("yunnai-ui", ui_command, str(path), int(ui_process_port) if ui_process_port else None)
 
         logger.info("开启事件循环")
         event_loop.run_forever()
@@ -124,9 +115,10 @@ class Application:
         await asyncio.sleep(0.01)
         session = self.ai.create_session(model_name if model_name else self.llm_model)
         self.plugin_manager.trigger("on_message_before_send", session=session, messages=messages)
-        session.add_messages(*messages)
-        self.ai.start_response(session)
-        self.plugin_manager.trigger("on_message_after_sended")
+        if not session.canceled:
+            session.add_messages(*messages)
+            self.ai.start_response(session)
+            self.plugin_manager.trigger("on_message_after_sended")
     
     def run(self):
         logger.info("开始运行程序")

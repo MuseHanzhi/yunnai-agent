@@ -8,6 +8,7 @@ class ChatSession:
         self.tools = tools
         self.extra_body: dict[str, Any] = {}
         self.model_name = model_name
+        self.canceled = False
     
     def set_prompt(self, prompt_text):
         self.messages.append({
