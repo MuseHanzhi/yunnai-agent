@@ -1,11 +1,8 @@
-from typing import Any
-
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
 import asyncio
-import pathlib
 import os
 
-from src.core.ui_process import UIProcess
+from src.common import prompt_tools
 from src.core.ai_chat import AIChat
 from src.core.plugin_manager import PluginManager
 from src.components.logger import logger as log
@@ -41,6 +38,7 @@ class Application:
         self.reply_text = ""
         self.llm_model = os.getenv("LLM_MODEL", "")
         self.is_ready = False
+        self.prompts: dict[str, str] = {}
     
     def close(self):
         event_loop = asyncio.get_event_loop()
@@ -96,6 +94,7 @@ class Application:
                 finish_reason = finish_reason
             )
     
+    
     def _run(self):
         # IPC 服务端
         ipc_host = os.getenv('IPC_HOST')
@@ -111,12 +110,17 @@ class Application:
         logger.info("开启事件循环")
         event_loop.run_forever()
     
-    async def sync_send_message(self, model_name: str | None = None, *messages: ChatCompletionMessageParam):
+    async def sync_send_message(self, message: str, model_name: str | None = None):
         await asyncio.sleep(0.01)
         session = self.ai.create_session(model_name if model_name else self.llm_model)
-        self.plugin_manager.trigger("on_message_before_send", session=session, messages=messages)
+        session.system_prompt = prompt_tools.read_prompt("chat")
+        session.user_input = message
+        self.plugin_manager.trigger("on_message_before_send", session=session)
         if not session.canceled:
-            session.add_messages(*messages)
+            session.append_user_prompt(f"""
+# 用户问题
+{message}
+""")
             self.ai.start_response(session)
             self.plugin_manager.trigger("on_message_after_sended")
     
@@ -127,7 +131,6 @@ class Application:
         except Exception as e:
             logger.error(f"出现异常: {e}")
             return 1
-
         try:
             self.plugin_manager.trigger("on_app_will_close")
         except Exception as err:

@@ -9,23 +9,27 @@ class ChatSession:
         self.extra_body: dict[str, Any] = {}
         self.model_name = model_name
         self.canceled = False
-    
-    def set_prompt(self, prompt_text):
-        self.messages.append({
-            "role": "system",
-            "content": prompt_text
-        })
+        self.system_prompt = ""
+        self.user_input = ""
+        self.user_prompt = ""
     
     def add_tools(self, *tools: ChatCompletionToolUnionParam):
         for tool in tools:
             self.tools.append(tool)
     
-    def add_messages(self, *messages: ChatCompletionMessageParam):
-        for message in messages:
-            self.messages.append(message)
+    def append_system_prompt(self, content: str):
+        prompt = content if content.endswith("\n") else content + "\n"
+        self.system_prompt += prompt
+    
+    def append_user_prompt(self, content: str):
+        prompt = content if content.endswith("\n") else content + "\n"
+        self.user_prompt += prompt
     
     def set_extra_body(self, key: str, value: Any):
         self.extra_body[key] = value
+    
+    def set_thinking(self, state: bool):
+        self.extra_body["thinking"] = state
     
     def clear(self):
         self.messages = []

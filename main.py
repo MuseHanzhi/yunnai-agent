@@ -10,41 +10,9 @@ from src.plugins import (
     ToolsPlugin,
     TTSPlugin,
 )
-
-#region
-# def wakeup_handler():
-#     try:
-#         main_app.plugin_manager.emit("wakeup_plugin", "start")
-#     except:
-#         ...
-
-# def speak_end(_text: str):
-#     try:
-#         main_app.plugin_manager.emit("wakeup_plugin", "start")
-#     except Exception as e:
-#         logger.error(f"出现错误: {e}")
-
-# def asr_ended():
-#     speak_end("")
-#endregion
-
 def setup_plugins() -> list[Plugin]:
-    #region
-    # global wakeup_plugin, asr_plugin
-    # wakeup_plugin = WakeupPlugin(
-    #     "wakeup_plugin",
-    #     ["wakeup_models/nihao-yunnai_zh_windows_v4_0_0.ppn"],
-    #     text="",
-    #     callback=wakeup_handler)
-    
-    # asr_plugin = ASRPlugin("asr_plugin", end_time=3000)
-    # asr_plugin.bind_speak_end(speak_end)
-    # asr_plugin.bind_ended(asr_ended)
-    #endregion
     
     return [
-        # wakeup_plugin,
-        # asr_plugin,
         ToolsPlugin("tools_plugin", inner_tool=inner_tools),
         TTSPlugin("tts_plugin")
     ]
@@ -69,18 +37,12 @@ def env_check():
 
 
 def main():
-    if not env_check():
-        sys.exit(1)
-
-    main_app.app_init(setup_plugins())
+    main_app.app_init()
     sys.exit(main_app.run())
 
 load_dotenv()
+
 logger = log.create(__name__)
-#region
-# wakeup_plugin: WakeupPlugin
-# asr_plugin: ASRPlugin
-#endregion
 main_app = Application(sys.argv)
 env_names: list[str] = [
     "DASHSCOPE_API_KEY",
@@ -93,5 +55,7 @@ inner_tools = {
 }
 
 if __name__ == '__main__':
+    if not env_check():
+        sys.exit(1)
     main()
     # test()
