@@ -1,103 +1,70 @@
-from application import Application
+from core.ai_chat.chat_state import ChatState
 from src.plugins.plugin import Plugin
-from src.core.ai_chat.ai_chat import (
-    AIChat,
-    ChatSession
-)
-from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam
-import typing
-import asyncio
+from src.core.ai_chat import AIChat
+from os import path
+from src.components.logger import logger as log
 import json
 import os
 
-from .types.change_model import ChangeModelOption
+from typing import (
+    Literal,
+    cast
+)
 
-if typing.TYPE_CHECKING:
-    from src.application import Application
 
+logger = log.create(__name__)
+
+TaskType = Literal["chat", "agent"]
 class ModelRouterPlugin(Plugin):
     def __init__(self):
-        super().__init__("model-router-plugin", desc="根据用户输入，切换模型")
-        
-        llm_api_url = os.getenv("LLM_URL")
-        llm_api_key = os.getenv("DASHSCOPE_API_KEY")
-        if llm_api_key is None or llm_api_url is None:
-            raise Exception("未设定环境变量 'LLM_URL' 或 'DASHSCOPE_API_KEY'")
-        
-        self.ai_chat: AIChat = AIChat({
-            "api_key": llm_api_key,
-            "base_url": llm_api_url
+        super().__init__("model-router-plugin", desc="路由模型，分析用户输入选择Agent或者Chat模式")
+        self.ai_chat = AIChat({
+            "base_url": os.getenv("LLM_URL", "")
         })
-        self.app: "Application |  None" = None
-        self.result: ChangeModelOption | None = None
-        self.target_model: str | None = None
-        self.chat_history: list[ChatCompletionMessageParam] = []
-        self.response_text: str = ""
+        self.state = self.ai_chat.create_state(os.getenv("LLM_MODEL", ""))
+        self.agent_prompt = ""
+        self.chat_prompt = ""
     
-    def on_app_before_initialize(self, app: Application):
-        self.app = app
-        self.ai_chat.bind_response_handler(self.on_router_model_response)
+    def get_prompt_content(self, type: Literal["chat", "agent", "model_router"]):
+        root_path = path.abspath("prompts")
+        prompt_path = path.join(root_path, f"{type}.md")
+        if path.exists(prompt_path):
+            with open(prompt_path, encoding="utf-8") as fs:
+                return fs.read()
+        raise FileNotFoundError(f"找不到提示词文件'{prompt_path}'")
     
-    def on_router_model_response(self, chunk: ChatCompletionChunk | None, finish_reason: str | None):
-        if chunk and finish_reason is None and chunk.choices[0].delta.content:
-            self.response_text += chunk.choices[0].delta.content
-        elif finish_reason:
-            self.result = self.try_parse_json(self.response_text)
-            if self.result is None and self.app:
-                asyncio.get_event_loop()\
-                    .create_task(
-                        self.app.ipc.emit(
-                            'main_window',
-                            "ai-response",
-                            message = self.response_text,
-                            model_name = "model_router"
-                            )
-                        )
-            else:
-                self.result = {
-                    "model": "no-result",
-                    "prompt_name": "model_router"
-                }
-            
-
-    @staticmethod
-    def try_parse_json(json_string: str) -> typing.Optional[ChangeModelOption]:
+    def init(self):
         try:
-            return json.loads(json_string)
-        except:
-            return None
-        
-    @staticmethod
-    def read_prompt_text(name: typing.Literal["chat", "agent", "model_router"]):
-        base_path = os.path.abspath("prompts")
-        prompt_file = os.path.join(base_path, f"{name}.md")
-        with open(prompt_file, "r", encoding="utf-8") as f:
-            return f.read()
-    
-    async def start(self, *user_message: ChatCompletionMessageParam):
-        session = self.ai_chat.create_session("deepseek-chat")
-
-        system_prompt = self.read_prompt_text("model_router")
-        session.set_system_prompt(system_prompt)
-        session.add_messages(*user_message)
-        self.ai_chat.start_response(session)
-    
-    def on_message_before_send(self, session: ChatSession):
-        if session.model_name == "model_router":
+            self.state.system_prompt = self.get_prompt_content("model_router")
+            self.chat_prompt = self.get_prompt_content("chat")
+            self.agent_prompt = self.get_prompt_content("agent")
+        except FileNotFoundError as ex:
+            logger.error(f"系统提示词加载失败: {ex}")
+            super().state = False
             return
-        
-        event_loop = asyncio.get_event_loop()
-        event_loop.create_task(self.start(*session.messages))
-        self.result = None
+        self.state.set_thinking(False)
+    
+    def handle(self, user_input: str):
+        self.state.user_input = user_input
+        response_text, _ = self.ai_chat.complete(self.state)
+        try:
+            res: dict[str, str] = json.loads(response_text)
+            type_value = res.get("type", "chat")
+            type: TaskType = cast(TaskType, type_value)
+            model = res.get("model")
+            return type, model
+        except Exception as ex:
+            logger.error(f"出现异常: {ex}")
+            return None, None
+    
+    def on_message_before_send(self, state: ChatState):
+        type, model = self.handle(state.user_input)
 
-        while not self.result:  # 阻塞，直到有结果为止
-            event_loop.run_until_complete(asyncio.sleep(0.5))
-        if self.result['model'] != "no-result":
-            session.model_name = self.result["model"]
-            session.messages.pop()  # 弹出最后一个用户消息
-            session.add_messages(*self.chat_history)    # 这里面有刚刚弹出的用户消息
+        if type and model:
+            state.model_name = model
+            state.type = type
 
-            # 设置相应的系统提示词
-            system_prompt = self.read_prompt_text(self.result["prompt_name"])
-            session.set_system_prompt(system_prompt)
-            
+            if type == "agent":
+                state.system_prompt = self.agent_prompt
+            elif type == "chat":
+                state.system_prompt = self.chat_prompt

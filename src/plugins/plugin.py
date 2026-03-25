@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Iterator
 from openai.types.chat import ChatCompletionChunk,ChatCompletionMessageParam
-from src.core.ai_chat.chat_session import ChatSession
+from src.core.ai_chat.chat_state import ChatState
 
 if TYPE_CHECKING:
     from src.application import Application
@@ -25,7 +25,6 @@ class Plugin:
         """
         应用程序初始化前触发
         
-        :param self: 插件实例
         :param app: 主程序实例
         """
         ...
@@ -50,12 +49,11 @@ class Plugin:
         大模型响应完毕
         """
     
-    def on_message_before_send(self, session: ChatSession, messages: Iterator[ChatCompletionMessageParam]):
+    def on_message_before_send(self, state: ChatState):
         """
         向智能体发送信息前触发
         
-        :param self: 插件实例
-        :param message: 将要发送的信息
+        :param state: 消息状态
         """
         ...
     

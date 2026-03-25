@@ -14,7 +14,6 @@ class InvokeSession(TypedDict):
     future: asyncio.Future
     timer: asyncio.TimerHandle
 
-
 class IPCServer:
     def __init__(self, host: str = "localhost", port: int = 8866):
         self.websocket_server = WebSocketServer(host, port)

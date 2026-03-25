@@ -3,17 +3,14 @@ import sys
 import os
 
 from src.plugins.plugin import Plugin
-from src.application_tools import application_tools
 from src.components.logger import logger as log
 from src.application import Application
 from src.plugins import (
-    ToolsPlugin,
     TTSPlugin,
 )
 def setup_plugins() -> list[Plugin]:
     
     return [
-        ToolsPlugin("tools_plugin", inner_tool=inner_tools),
         TTSPlugin("tts_plugin")
     ]
 
@@ -48,11 +45,6 @@ env_names: list[str] = [
     "DASHSCOPE_API_KEY",
     "PORCUPINE_ACCESSKEY"
 ]
-inner_tools = {
-    "plugin_list": application_tools.get_plugin_list,
-    "set_plugin_state": application_tools.set_plugin_state,
-    "idle": application_tools.idle
-}
 
 if __name__ == '__main__':
     if not env_check():

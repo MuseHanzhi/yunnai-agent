@@ -94,7 +94,6 @@ class Application:
                 finish_reason = finish_reason
             )
     
-    
     def _run(self):
         # IPC 服务端
         ipc_host = os.getenv('IPC_HOST')
@@ -111,19 +110,17 @@ class Application:
         event_loop.run_forever()
     
     async def sync_send_message(self, message: str, model_name: str | None = None):
-        await asyncio.sleep(0.01)
-        session = self.ai.create_session(model_name if model_name else self.llm_model)
-        session.system_prompt = prompt_tools.read_prompt("chat")
-        session.user_input = message
-        self.plugin_manager.trigger("on_message_before_send", session=session)
-        if not session.canceled:
-            session.append_user_prompt(f"""
-# 用户问题
-{message}
-""")
-            self.ai.start_response(session)
-            self.plugin_manager.trigger("on_message_after_sended")
-    
+        state = self.ai.create_state(model_name if model_name else self.llm_model)
+        state.system_prompt = prompt_tools.read_prompt("chat")
+        state.user_input = message
+        self.plugin_manager.trigger("on_message_before_send", state=state)
+        if state.canceled:
+            return
+        self.ai.start_response(state)
+        self.plugin_manager.trigger("on_message_after_sended")
+        if state.type == "agent":
+            await self.ipc.emit(None, "agent-mode", task_name=message)
+
     def run(self):
         logger.info("开始运行程序")
         try:

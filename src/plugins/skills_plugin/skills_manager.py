@@ -1,3 +1,0 @@
-class SkillsManager:
-    def __init__(self):
-        ...

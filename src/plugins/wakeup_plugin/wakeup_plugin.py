@@ -126,10 +126,7 @@ class WakeupPlugin(Plugin):
 
         if self.text:
             self.event_loop.create_task(
-                self.app.sync_send_message(None, {
-                    "role": "user",
-                    "content": self.text
-                })
+                self.app.sync_send_message(self.text)
             )
         if self.on_detect:
             self.on_detect()
