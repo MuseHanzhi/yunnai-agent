@@ -1,4 +1,4 @@
-from core.ai_chat.chat_state import ChatState
+from src.components.ai_chat.chat_state import ChatState
 from src.plugins.plugin import Plugin
 from typing import Literal, TYPE_CHECKING
 from openai.types.chat import ChatCompletionChunk, ChatCompletionMessageParam

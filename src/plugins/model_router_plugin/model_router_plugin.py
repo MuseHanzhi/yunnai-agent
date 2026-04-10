@@ -1,6 +1,6 @@
-from core.ai_chat.chat_state import ChatState
+from src.components.ai_chat.chat_state import ChatState
 from src.plugins.plugin import Plugin
-from src.core.ai_chat import AIChat
+from src.components.ai_chat import AIChat
 from os import path
 from src.components.logger import logger as log
 import json
@@ -35,7 +35,7 @@ class ModelRouterPlugin(Plugin):
     
     def init(self):
         try:
-            self.state.system_prompt = self.get_prompt_content("model_router")
+            self.state.fixed_sys_prompt = self.get_prompt_content("model_router")
             self.chat_prompt = self.get_prompt_content("chat")
             self.agent_prompt = self.get_prompt_content("agent")
         except FileNotFoundError as ex:
@@ -65,6 +65,6 @@ class ModelRouterPlugin(Plugin):
             state.type = type
 
             if type == "agent":
-                state.system_prompt = self.agent_prompt
+                state.fixed_sys_prompt = self.agent_prompt
             elif type == "chat":
-                state.system_prompt = self.chat_prompt
+                state.fixed_sys_prompt = self.chat_prompt

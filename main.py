@@ -6,12 +6,13 @@ from src.plugins.plugin import Plugin
 from src.components.logger import logger as log
 from src.application import Application
 from src.plugins import (
-    TTSPlugin,
+    SessionPlugin,
+    WeChatPlugin
 )
 def setup_plugins() -> list[Plugin]:
-    
     return [
-        TTSPlugin("tts_plugin")
+        SessionPlugin(),
+        # WeChatPlugin(),
     ]
 
 def env_check():
@@ -29,12 +30,13 @@ def env_check():
             result = False
             logger.warning(f"请配置环境变量'{env_name}'")
         logger.info(f"'{env_name}'===OK")
-
     return result
 
 
 def main():
-    main_app.app_init()
+    main_app.app_init(
+        setup_plugins()
+    )
     sys.exit(main_app.run())
 
 load_dotenv()
@@ -42,8 +44,7 @@ load_dotenv()
 logger = log.create(__name__)
 main_app = Application(sys.argv)
 env_names: list[str] = [
-    "DASHSCOPE_API_KEY",
-    "PORCUPINE_ACCESSKEY"
+    "DASHSCOPE_API_KEY"
 ]
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Iterator
-from openai.types.chat import ChatCompletionChunk,ChatCompletionMessageParam
-from src.core.ai_chat.chat_state import ChatState
+from typing import TYPE_CHECKING
+from openai.types.chat import ChatCompletionChunk
+from src.components.ai_chat.chat_state import ChatState
 
 if TYPE_CHECKING:
     from src.application import Application
@@ -16,6 +16,9 @@ class Plugin:
         self.state = True
     
     def init(self):
+        """
+        插件初始化时触发
+        """
         ...
 
     def set_state(self, state: bool):
@@ -47,6 +50,8 @@ class Plugin:
     def on_model_response_completed(self, finish_reason: str):
         """
         大模型响应完毕
+        
+        :param finish_reason: 完成原因：后续可能计划移除
         """
     
     def on_message_before_send(self, state: ChatState):

@@ -1,25 +1,22 @@
-from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToolUnionParam
 from openai.types.chat import ChatCompletionMessageParam
 from typing import Any, Literal
 
 class ChatState:
-    def __init__(self, model_name: str, messages: list[ChatCompletionMessageParam] = [], tools: list[ChatCompletionToolUnionParam] = []):
-        self.messages = messages
-        self.tools = tools
+    def __init__(self, model_name: str, messages: list[ChatCompletionMessageParam] | None = None):
+        self.messages = messages if messages else []
         self.extra_body: dict[str, Any] = {}
         self.model_name = model_name
         self.canceled = False
-        self.system_prompt = ""
+        self.dynamic_sys_prompt = ""
+        self.fixed_sys_prompt = ""
         self.user_input = ""
+        self.msg_type: Literal["user", "system"] = "user"
+
         self.type: Literal["agent", "chat"] = "chat"
-    
-    def add_tools(self, *tools: ChatCompletionToolUnionParam):
-        for tool in tools:
-            self.tools.append(tool)
     
     def append_system_prompt(self, content: str):
         prompt = content if content.endswith("\n") else content + "\n"
-        self.system_prompt += prompt
+        self.dynamic_sys_prompt += prompt
     
     def set_extra_body(self, key: str, value: Any):
         self.extra_body[key] = value

@@ -19,7 +19,7 @@ def add_handler_for_level(level: str, *handles: logging.Handler):
     else:
         _handlers[level] = list(handles)
 
-def add_filter(level: str, *filters: logging.Filter):
+def add_filter(*filters: logging.Filter):
     global _filters
     if not _filters:
         _filters = list(filters)

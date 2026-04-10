@@ -7,7 +7,8 @@ from typing import (
 
 class ServiceConfig(TypedDict):
     base_url: Required[str]
-    api_key: NotRequired[str]
+    api_key: Required[str]
+    model_name: Required[str]
 
 class EnvOptions(TypedDict):
     lang: NotRequired[str | None]
