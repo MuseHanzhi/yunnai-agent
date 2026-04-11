@@ -7,11 +7,11 @@ from wxautox4.msgs import (
     BaseMessage  # 基础消息类
 )
 import typing  # 类型提示支持
-from src.components.logger.logger import create  # 日志创建器
+from src.components.logger.logger import LogCreator  # 日志创建器
 
 
 # 创建日志记录器
-logger = create(__name__)
+logger = LogCreator.instance.create(__name__)
 # 定义消息回调函数的类型别名
 message_callback = typing.Callable[[BaseMessage, Chat], None]
 class WeChatEvent(WeChat):

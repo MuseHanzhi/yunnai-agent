@@ -2,18 +2,10 @@ from dotenv import load_dotenv
 import sys
 import os
 
+from src.components.app_config import app_config
 from src.plugins.plugin import Plugin
-from src.components.logger import logger as log
+from src.components.logger.logger import LogCreator
 from src.application import Application
-from src.plugins import (
-    SessionPlugin,
-    WeChatPlugin
-)
-def setup_plugins() -> list[Plugin]:
-    return [
-        SessionPlugin(),
-        # WeChatPlugin(),
-    ]
 
 def env_check():
     """
@@ -23,8 +15,8 @@ def env_check():
     result = True
 
     logger.info("开始进行环境检查")
-
-    for env_name in env_names:
+    require_evns: list[str] = app_config.config["system"].get("require_env", [])
+    for env_name in require_evns:
         ali_key = os.getenv(env_name)
         if not ali_key:
             result = False
@@ -34,18 +26,15 @@ def env_check():
 
 
 def main():
-    main_app.app_init(
-        setup_plugins()
-    )
+    main_app.initialize()
     sys.exit(main_app.run())
 
 load_dotenv()
+app_config.load("./app_config.yaml")
+LogCreator.instance.load_config(app_config.config["logging"])
 
-logger = log.create(__name__)
+logger = LogCreator.instance.create(__name__)
 main_app = Application(sys.argv)
-env_names: list[str] = [
-    "DASHSCOPE_API_KEY"
-]
 
 if __name__ == '__main__':
     if not env_check():

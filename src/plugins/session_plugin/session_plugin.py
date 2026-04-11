@@ -16,7 +16,7 @@ class SessionPlugin(Plugin):
         self.type: Literal["chat", "agent"] = "chat"
         self.app: "Application | None" = None
     
-    def on_app_before_initialize(self, app: "Application"):
+    def on_app_before_initialize(self, app: "Application", event_loop):
         self.app = app
     
     def on_message_before_send(self, state: ChatState):
@@ -30,11 +30,11 @@ class SessionPlugin(Plugin):
             self.agent_records = []    
         self.type = state.type
     
-    def on_model_response(self, chunk: ChatCompletionChunk):
+    def on_llm_response(self, chunk: ChatCompletionChunk):
         if chunk.choices[0].delta.content:
             self.response_text += chunk.choices[0].delta.content
     
-    def on_model_response_completed(self, finish_reason: str):
+    def on_llm_response_completed(self, finish_reason: str):
         if self.type == "chat":
             self.chat_records.append({
                 "role": "user",

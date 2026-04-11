@@ -1,68 +1,89 @@
-from typing import MutableMapping
-from src.plugins import Plugin
-from typing import Literal
-import src.components.logger.logger as log
+from src.components.logger.logger import LogCreator
+from src.components.app_config.types import PluginConfig, PluginOption
+from src.plugins.plugin import (
+    Hooks,
+    Plugin
+)
+import importlib
 
+logger = LogCreator.instance.create(__name__)
 
-Timing = Literal[
-    "on_app_before_initialize",
-    "on_app_after_initialized",
-    "on_model_response",
-    "on_model_response_completed",
-    "on_app_will_close",
-    "on_message_before_send",
-    "on_message_after_sended",
-    "on_ready"
-]
-
-logger = log.create(__name__)
-
-class PluginManager(MutableMapping[str, Plugin]):
-    def __delitem__(self, key: str) -> None:
-        del self.plugins[key]
-
-    def __iter__(self):
-        return self.plugins.__iter__()
-
-    def __len__(self):
-        return len(self.plugins)
-        
-    def __getitem__(self, name) -> Plugin | None:
-        return self.plugins.get(name)
-    
-    def __setitem__(self, key: str, value: Plugin) -> None:
-        self.plugins[key] = value
-
-    def __init__(self):
+class PluginManager:
+    def __init__(self, config: PluginConfig):
         self.plugins: dict[str, Plugin] = {}
+        self.hook_registry_map: dict[Hooks, list[Plugin]] = {}
+        self.initialize(config)
     
-    def init(self):
+    def initialize(self, config: PluginConfig):
+        base_module = config["base_module"].strip(".")
+        plugins: list[PluginOption] = config.get("plugins", [])
+        for plugin in plugins:
+            module_path = ".".join([base_module, plugin["module_path"].strip(".")])
+            logger.info(f"开始加载插件: {module_path}")
+
+            module = importlib.import_module(module_path)
+            # 实例化插件
+            plugin_class_instance: Plugin
+            try:
+                plugin_class_name = plugin.get("class_name")
+                if not plugin_class_name:   # 没有绑定类名则直接用主模块的目录作为插件类名
+                    plugin_class_name = "".join([f"{item[0].upper()}{item[1:]}" for item in module_path.split(".")[-2].split("_") if item])
+                plugin_class_instance = getattr(module, plugin_class_name)()
+            except TypeError:
+                logger.warning(f"插件类'{plugin_class_name}'找不到无参构造函数 - 跳过加载")
+                continue
+            except IndexError:
+                logger.warning(f"插件插件模块路径'{module_path}'无效 - 跳过加载")
+                continue
+
+            # 被后来的同名插件覆盖
+            if plugin_class_instance.name in self.plugins:
+                logger.warning(f"插件 '{plugin_class_instance.name}'名称与其他插件名称冲突，跳过加载")
+
+            # 注册hook与移除冲突的插件Hook
+            for hook_name in plugin_class_instance.hook_registry:
+                if hook_name in self.hook_registry_map:
+                    self.hook_registry_map[hook_name].append(plugin_class_instance)
+                else:
+                    self.hook_registry_map[hook_name] = [plugin_class_instance]
+            
+            # 注册插件
+            self.plugins[plugin_class_instance.name] = plugin_class_instance
+            logger.info(f"插件'{module_path}'加载完成")
+            
+    
+    def init_plugin(self):
         for (name, plugin) in self.plugins.items():
             try:
                 plugin.init()
                 logger.info(f"'{name}' 已就绪")
             except Exception as e:
-                logger.warning(f"插件 '{name}' 初始化出现异常: {e}")
+                logger.warning(f"插件 '{name}' 初始化时出现异常: {e}")
+            
+    
+    def remove(self, target: str | Plugin):
+        if target not in self.plugins:
+            return
+        
+        if isinstance(target, str):
+            target = self.plugins.pop(target)
+        elif isinstance(target, Plugin):
+            self.plugins.pop(target.name)
+        else:
+            return
+        
+        try:
+            target.deinit()
+        except Exception as ex:
+            logger.error(f"插件'{target.name}'移除时出现异常", exc_info=ex)
 
-    def add(self, *plugins: Plugin):
-        for plugin in plugins:
-            if plugin.name in self.plugins:
-                logger.warning(f"插件 '{plugin.name}' 被覆盖")
-            self.plugins[plugin.name] = plugin
-    
-    def remove(self, plugin: str | Plugin):
-        if isinstance(plugin, str) and plugin in self.plugins:
-            target = self.plugins.pop(plugin)
-            target.set_state(False)
-        elif isinstance(plugin, Plugin):
-            self.plugins.pop(plugin.name)
-            plugin.set_state(False)
-    
-    def set_plugin_state(self, name: str, state: bool):
-        plugin = self.plugins.get(name)
-        if not plugin:
-            raise ValueError(f"没有名为'{name}'的插件")
-        plugin.set_state(state)
+        # 移除hook
+        for hook in target.hook_registry:
+            if hook not in self.hook_registry_map:
+                continue
+            self.hook_registry_map[hook].remove(target)
+            if not self.hook_registry_map[hook]:
+                self.hook_registry_map.pop(hook)
     
     def get_plugin(self, name: str) -> None | Plugin:
         return self.plugins.get(name)
@@ -74,36 +95,10 @@ class PluginManager(MutableMapping[str, Plugin]):
         plugin.emit(name, arguments)
 
 
-    def trigger(self, timming: Timing, **arguments):
-        try:
-            for _, plugin in self.plugins.items():
-                if not plugin.state:
-                    continue
-                if timming == "on_app_before_initialize":   # 应用初始化前
-                    plugin.on_app_before_initialize(**arguments)
-                    continue
-                if timming == "on_app_after_initialized":   # 应用初始化后
-                    plugin.on_app_after_initialized()
-                    continue
-                if timming == "on_model_response":                # 智能体回复
-                    plugin.on_model_response(**arguments)
-                    continue
-                if timming == "on_model_response_completed":      # 智能体回复完毕
-                    plugin.on_model_response_completed(**arguments)
-                    continue
-                if timming == "on_app_will_close":          # 应用将关闭
-                    plugin.on_app_will_close()
-                    continue
-                if timming == "on_message_before_send":     # 信息发送前
-                    plugin.on_message_before_send(**arguments)
-                    continue
-                if timming == "on_message_after_sended":    # 信息发送后
-                    plugin.on_message_after_sended()
-                    continue
-                if timming == "on_ready": # 程序准备完毕
-                    plugin.on_ready(**arguments)
-                    continue
-        except Exception as err:
-            raise err
-
-
+    def trigger(self, hook_name: Hooks, **arguments):
+        hooks = self.hook_registry_map.get(hook_name, [])
+        for plugin in hooks:
+            try:
+                getattr(plugin, hook_name)(**arguments)
+            except Exception as err:
+                logger.error(f"触发插件'{plugin.name}'的Hook时发生异常", exc_info=err)

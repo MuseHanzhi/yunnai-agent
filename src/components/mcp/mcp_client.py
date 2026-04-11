@@ -22,7 +22,7 @@ from src.components.app_config.types import (
     MCPStreamableHTTP
 )
 from .in_memory_token_storage import InMemoryTokenStorage
-from src.components.logger.logger import create
+from src.components.logger.logger import LogCreator
 
 if TYPE_CHECKING:
     from .types import (
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 OnConnectedHandler = Callable[[], None]
 OnConnectErrorHandler = Callable[[Exception], None]
-logger = create(__name__)
+logger = LogCreator.instance.create(__name__)
 class MCPClient:
     def __init__(self, client_info: "ClientInfo", config: Union[MCPStdio, MCPStreamableHTTP]):
         self.session: ClientSession | None = None

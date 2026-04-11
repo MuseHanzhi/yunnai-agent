@@ -1,11 +1,11 @@
 import websockets
 import asyncio
 from typing import Callable, TypedDict
-import src.components.logger as log
+from src.components.logger.logger import LogCreator
 import time
 from urllib import parse as urlparser
 
-logger = log.create(__name__)
+logger = LogCreator.instance.create(__name__)
 
 class ConnectUnit(TypedDict):
     conn: websockets.ServerConnection

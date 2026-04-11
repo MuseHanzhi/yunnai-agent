@@ -1,9 +1,8 @@
 from openai.types.chat import ChatCompletionChunk
 
 from src.common import public_tools
-from src.components.ai_chat.chat_state import ChatState
-from src.plugins import Plugin
-from src.components.logger.logger import create
+from src.plugins.plugin import Plugin
+from src.components.logger.logger import LogCreator
 from .wechat_bot.wechat_client import WeChatClient
 from wxautox4 import Chat
 from wxautox4.msgs import (
@@ -24,24 +23,32 @@ from datetime import datetime
 if typing.TYPE_CHECKING:
     from src.application import Application
 
-logger = create(__name__)
+logger = LogCreator.instance.create(__name__)
 
 class TaskUnit(typing.TypedDict):
     name: str
     message: BaseMessage
     future: asyncio.Future
 
-class WeChatPlugin(Plugin):
+class WXAutoPlugin(Plugin):
     def __init__(self):
-        super().__init__("wechat_plugin")
-        self.client = WeChatClient()
+        super().__init__("wechat-plugin")
+        self.client: None | WeChatClient = None
         self.app: "Application | None" = None
         self.llm_text = ""
         self.future: asyncio.Future | None = None
         self.send_messages: list[str] = []
         self.handling = False
-        self.tasks: dict[str, TaskUnit] = {}
         self.results: dict[str, asyncio.Future] = {}
+    
+    def init(self):
+        self.client = WeChatClient()
+    
+    def deinit(self):
+        if self.client:
+            self.client.Close()
+        self.results = {}
+        self.send_messages = []
     
     def on_wechat_message(self, message, chat: Chat):
         logger.info(f"接收到{chat.who}的消息: {message}")
@@ -63,28 +70,34 @@ class WeChatPlugin(Plugin):
             asyncio.run(self.send_message(message, chat))
         else:
             self.send_messages.append(text)
-
-        # event_loop.run_forever()
     
     async def search(self, search_info: dict, message: BaseMessage, chat: Chat):
-        if not isinstance(message, HumanMessage) or self.app is None:
+        if not isinstance(message, HumanMessage) or self.app is None or self.app.mcp_manager is None:
             return
-        id: str = search_info["id"]
-        future = asyncio.Future[str]()
-        self.tasks[id] = {
-            "name": "web_search",
-            "future": future,
-            "message": message
-        }
-
-        search_result = await future
-
-        self.tasks.pop(id)
-
+        
         event_loop = asyncio.get_running_loop()
-        event_loop.create_task(self.app.sync_send_message(f"""# 搜索结果
+        id: str = search_info["id"]
+        activate_ok = True
+        if not self.app.mcp_manager.is_activate("WebSearch"):
+            try:
+                await self.app.mcp_manager.activate("WebSearch")
+            except Exception as ex:
+                logger.error(f"搜索工具MCP激活失败: {ex}", exc_info=ex)
+                activate_ok = False
+        
+        if activate_ok:
+            search_result = await self.app.mcp_manager.call_tool("WebSearch", "bailian_web_search", {
+                "query": search_info["keyword"],
+                "count": 10
+            })
+            event_loop.create_task(self.app.sync_send_message(f"""# 搜索结果
 id: {id}
-result: {search_result}
+result: {search_result["content"]}
+""", "system"))
+        else:
+            event_loop.create_task(self.app.sync_send_message(f"""# 搜索结果
+id: {id}
+result: 搜索工具激活失败
 """, "system"))
         
         result_future = asyncio.Future[list[str]]()
@@ -132,18 +145,18 @@ result: {search_result}
             messages = reply["messages"]
             await self.reply_message(messages, chat)
     
-    def on_app_before_initialize(self, app: "Application"):
+    def on_app_before_initialize(self, app: "Application", event_loop: asyncio.AbstractEventLoop):
         self.app = app
+        
 
     def on_ready(self):
+        if not self.client:
+            logger.warning("WxAuto客户端为空")
+            return
         self.client.wechat_event.add_listen("friend/text,voice,emotion:LIOUA", self.on_wechat_message)
         self.client.wechat_event.add_listen("friend/text,voice,emotion:慕色寒枝", self.on_wechat_message)
     
-    def on_message_before_send(self, state: ChatState):
-        ...
-    
-    def on_model_response_completed(self, finish_reason: str):
-        logger.info("完成输出")
+    def on_llm_response_completed(self, finish_reason: str):
         reply: dict[str, typing.Any]
         try:
             reply = public_tools.extract_json(self.llm_text)
@@ -153,21 +166,16 @@ result: {search_result}
         finally:
             self.llm_text = ""
         
-        search_info = reply.get("web_search")
+        web_result_id = reply.get("web_result_id")
 
-        if self.future:
+        if web_result_id:
+            future = self.results.get(web_result_id)
+            if future:
+                future.set_result(reply["messages"])
+        elif self.future:
             self.future.set_result(reply)
             self.future = None
-        elif search_info:
-            search_id = search_info.get("id")
-            if search_id:
-                self.results[search_id].set_result(reply["messages"])
 
-    def on_model_response(self, chunk: ChatCompletionChunk):
+    def on_llm_response(self, chunk: ChatCompletionChunk):
         content = chunk.choices[0].delta.content
         self.llm_text += content if content else ""
-    
-    def emit(self, name: str, arguments: dict):
-        if name == "search-result":
-            task = self.tasks[arguments["id"]]
-            task["future"].set_result(arguments["result"])

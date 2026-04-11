@@ -1,0 +1,82 @@
+logging:    # 日志
+    default: "info"
+    handlers:
+        info:
+            -   &console_handler
+                type: "console"
+                format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+            -   &file_handler
+                type: "file"
+                format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                log_path: "logs"
+        debug:
+            - 
+                <<: *file_handler
+            - 
+                <<: *console_handler
+        error:
+            - 
+                <<: *console_handler
+            - 
+                <<: *file_handler
+system:     # 系统配置
+    ipc_server:
+        host: "localhost"
+        port: 8866
+    require_env:
+        - DASHSCOPE_API_KEY
+        - KIMI_API_KEY
+        - DOUAO_API_KEY
+llm:        # 大模型
+    default: "Qwen3.6-plus"
+    models: 
+        "Qwen3.6-plus":
+            name: "qwen3.6-plus"
+            key_name: "DASHSCOPE_API_KEY"
+            base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        "kimi-k2-thinking":
+            name: "kimi-k2-thinking"
+            key_name: "KIMI_API_KEY"
+            base_url: "https://api.moonshot.cn/v1"
+        "doubao-1-5-pro-32k-250115":
+            name: "doubao-1-5-pro-32k-250115"
+            key_name: "DOUAO_API_KEY"
+            base_url: "https://ark.cn-beijing.volces.com/api/v3"
+capabilities:   # 能力
+    mcp:    # MCP
+        enable: true
+        servers:
+            "wxauto":
+                enable: true
+                cmd: "E:\\wechat_robot\\.venv\\Scripts\\python.exe"
+                desc: "模拟微信操作"
+                args: 
+                    - "-m"
+                    - "wxauto_mcp.server"
+            "time":
+                enable: true
+                desc: "间与时区管理服务，用于获取系统或全球各地的当前时间，并在不同 IANA 时区之间进行精确转换，适用于跨时区日程安排和时间换算场景。"
+                url: "https://mcpmarket.cn/mcp/5ab9ea8d24fb9bd50a647c14"
+                headers:
+                    "Content-Type": "application/json"
+                    "Accept": "application/json, text/event-stream"
+            "WebSearch":
+                enable: true
+                desc: "基于通义实验室 Text-Embedding，GTE-reRank，Query 改写，搜索判定等多种检索模型及语义理解，串接专业搜索工程框架及各类型实时信息检索工具，提供实时互联网全栈信息检索，提升 LLM 回答准确性及时效性。"
+                url: "https://dashscope.aliyuncs.com/api/v1/mcps/WebSearch/mcp"
+                headers:
+                    "Authorization": "Bearer ${DASHSCOPE_API_KEY}"
+    skills: # Agent Skills
+        enable: true
+        skills_paths:
+            - "./skills"
+plugin_config:  # 插件配置
+    base_module: "src.plugins"
+    plugins:
+        - 
+            module_path: "session_plugin.session_plugin"
+            class_name: null
+        - 
+            module_path: "wxauto_plugin.wxauto_plugin"
+            class_name: "WXAutoPlugin"
+

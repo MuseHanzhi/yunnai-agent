@@ -37,20 +37,17 @@
             "Qwen3.6-Plus": {
                 "name": "qwen3.6-plus",
                 "key_name": "DASHSCOPE_API_KEY",
-                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-                "stream": true
+                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1"
             },
             "kimi-k2-thinking": {
                 "name": "kimi-k2-thinking",
                 "key_name": "KIMI_API_KEY",
-                "base_url": "https://api.moonshot.cn/v1",
-                "stream": true
+                "base_url": "https://api.moonshot.cn/v1"
             },
             "doubao-1-5-pro-32k-250115": {
                 "name": "doubao-1-5-pro-32k-250115",
                 "key_name": "DOUAO_API_KEY",
-                "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-                "stream": true
+                "base_url": "https://ark.cn-beijing.volces.com/api/v3"
             }
         }
     },
@@ -88,7 +85,7 @@
         },
         "skills": {
             "enable": true,
-            "base_path": "/skills"
+            "skill_paths": []
         }
     }
 }

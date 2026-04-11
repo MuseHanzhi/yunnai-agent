@@ -6,9 +6,9 @@ import time
 
 from .types import IPCCommand, IPCData, IPCInvokeResult
 from .websocket_server import WebSocketServer
-import src.components.logger as log
+from src.components.logger.logger import LogCreator
 
-logger = log.create(__name__)
+logger = LogCreator.instance.create(__name__)
 
 class InvokeSession(TypedDict):
     future: asyncio.Future

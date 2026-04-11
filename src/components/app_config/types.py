@@ -11,13 +11,24 @@ class LLMConfig(typing.TypedDict):
     models: dict[str, LLMOption]
 
 # 日志配置
-class LoggingHandlerOptions:
+class LoggingHandlerOptions(typing.TypedDict):
     type: typing.Literal["console", "file"]
+    log_path: str | None
     format: str
 
-class LoggingOption:
+class LoggingOption(typing.TypedDict):
     default: str
-    handlers: dict[str, LoggingHandlerOptions]
+    handlers: dict[str, list[LoggingHandlerOptions]]
+
+
+# 系统配置
+class IPCServerOption(typing.TypedDict):
+    host: str
+    port: int
+
+class SystemOption(typing.TypedDict):
+    ipc_server: IPCServerOption
+    require_env: list[str]
 
 # 能力配置
 ## mcp
@@ -53,8 +64,19 @@ class Capabilities(typing.TypedDict):
     mcp: MCPOption
     skills: SkillsOption
 
+# 插件配置
+class PluginOption(typing.TypedDict):
+    module_path: str
+    class_name: str | None
+
+class PluginConfig(typing.TypedDict):
+    base_module: str
+    plugins: list[PluginOption]
+
 # 顶级配置结构
 class AppConfigOption(typing.TypedDict):
     logging: typing.Any
+    system: SystemOption
     llm: LLMConfig
     capabilities: Capabilities
+    plugin_config: PluginConfig

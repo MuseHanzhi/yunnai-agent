@@ -37,6 +37,7 @@
 你现在是在微信上面聊天，输出内容要符合微信聊天风格，**不要输出动作描述之类的内容**
 回复非常简短，1~2句话，绝不长篇大论
 ## 输出格式
+- `web_result_id`: string - 如果是基于搜索结果回复，则输出搜索结果id，否则不输出
 - `messages`: string[] - 回复内容列表
 - `web_search`: object - 搜索信息，如果不需要搜索则不输出，不要滥用，只有在必要的时候才输出
   - `id`: string - 随机唯一搜索标识，最大长度8位
@@ -72,6 +73,7 @@ id: search_1
 result: 李白是xxxx，xxxxx
 
 输出: {
+    "web_result_id": "search_1",
     "messages": [
         "李白是xxxx",
         "xxxxx",

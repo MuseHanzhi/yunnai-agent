@@ -1,6 +1,5 @@
 from wxautox4 import WeChat
 from .wechat_event import WeChatEvent
-import asyncio
 
 class WeChatClient(WeChat):
     def __init__(self):
@@ -10,3 +9,5 @@ class WeChatClient(WeChat):
     # async def run(self):
     #     self.
     #     await asyncio.threads.to_thread(self.KeepRunning)
+
+
