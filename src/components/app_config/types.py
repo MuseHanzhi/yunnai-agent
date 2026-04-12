@@ -5,8 +5,9 @@ class LLMOption(typing.TypedDict):
     name: str
     key_name: str
     base_url: str
+    stream: bool | None
 
-class LLMConfig(typing.TypedDict):
+class LLMConfigOption(typing.TypedDict):
     default: str
     models: dict[str, LLMOption]
 
@@ -20,15 +21,18 @@ class LoggingOption(typing.TypedDict):
     default: str
     handlers: dict[str, list[LoggingHandlerOptions]]
 
-
 # 系统配置
-class IPCServerOption(typing.TypedDict):
-    host: str
-    port: int
+
+class SysInfo(typing.TypedDict):
+    name: str
+    version: str
 
 class SystemOption(typing.TypedDict):
-    ipc_server: IPCServerOption
+    ipc_uri: str
     require_env: list[str]
+    thread_workers: int | None
+    system_prompt_path: str | None
+    sys_info: SysInfo
 
 # 能力配置
 ## mcp
@@ -37,14 +41,14 @@ class AuthOption(typing.TypedDict):
     callback_url: str
     redirect_uris: list[str]
 
-class MCPStreamableHTTP(typing.TypedDict):
+class MCPStreamableHTTPOption(typing.TypedDict):
     enable: bool
     url: str
     desc: str
     headers: dict[str, str] | None
     auth_option: AuthOption | None
 
-class MCPStdio(typing.TypedDict):
+class MCPStdioOption(typing.TypedDict):
     enable: bool
     cmd: str
     desc: str
@@ -53,14 +57,14 @@ class MCPStdio(typing.TypedDict):
 
 class MCPOption(typing.TypedDict):
     enable: bool
-    servers: dict[str, typing.Union[MCPStreamableHTTP, MCPStdio]] | None
+    servers: dict[str, typing.Union[MCPStreamableHTTPOption, MCPStdioOption]] | None
 
 ## skills
 class SkillsOption(typing.TypedDict):
     enable: bool
     base_path: str
 
-class Capabilities(typing.TypedDict):
+class CapabilitiesConfigOption(typing.TypedDict):
     mcp: MCPOption
     skills: SkillsOption
 
@@ -69,7 +73,7 @@ class PluginOption(typing.TypedDict):
     module_path: str
     class_name: str | None
 
-class PluginConfig(typing.TypedDict):
+class PluginConfigOption(typing.TypedDict):
     base_module: str
     plugins: list[PluginOption]
 
@@ -77,6 +81,6 @@ class PluginConfig(typing.TypedDict):
 class AppConfigOption(typing.TypedDict):
     logging: typing.Any
     system: SystemOption
-    llm: LLMConfig
-    capabilities: Capabilities
-    plugin_config: PluginConfig
+    llm: LLMConfigOption
+    capabilities: CapabilitiesConfigOption
+    plugin_config: PluginConfigOption

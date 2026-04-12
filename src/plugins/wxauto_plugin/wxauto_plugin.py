@@ -1,4 +1,4 @@
-from openai.types.chat import ChatCompletionChunk
+from openai.types.chat import ChatCompletionChunk, ChatCompletion
 
 from src.common import public_tools
 from src.plugins.plugin import Plugin
@@ -40,9 +40,11 @@ class WXAutoPlugin(Plugin):
         self.send_messages: list[str] = []
         self.handling = False
         self.results: dict[str, asyncio.Future] = {}
-    
-    def init(self):
-        self.client = WeChatClient()
+        self.hook_registry = [
+            "on_app_before_initialize",
+            "on_llm_response",
+            "on_ready"
+        ]
     
     def deinit(self):
         if self.client:
@@ -122,7 +124,6 @@ result: 搜索工具激活失败
             logger.info(f"send >> {msg}")
             is_first = False
 
-    
     async def send_message(self, message: BaseMessage, chat: Chat):
         if self.app:
             while True:
@@ -147,6 +148,7 @@ result: 搜索工具激活失败
     
     def on_app_before_initialize(self, app: "Application", event_loop: asyncio.AbstractEventLoop):
         self.app = app
+        self.client = WeChatClient()
         
 
     def on_ready(self):
@@ -156,7 +158,7 @@ result: 搜索工具激活失败
         self.client.wechat_event.add_listen("friend/text,voice,emotion:LIOUA", self.on_wechat_message)
         self.client.wechat_event.add_listen("friend/text,voice,emotion:慕色寒枝", self.on_wechat_message)
     
-    def on_llm_response_completed(self, finish_reason: str):
+    def on_llm_response_completed(self):
         reply: dict[str, typing.Any]
         try:
             reply = public_tools.extract_json(self.llm_text)
@@ -176,6 +178,17 @@ result: 搜索工具激活失败
             self.future.set_result(reply)
             self.future = None
 
-    def on_llm_response(self, chunk: ChatCompletionChunk):
-        content = chunk.choices[0].delta.content
-        self.llm_text += content if content else ""
+    def on_llm_response(self, chat_completion: "ChatCompletionChunk | ChatCompletion"):
+        if not chat_completion.choices:
+            logger.warning("大模型响应为空")
+            return
+        if isinstance(chat_completion, ChatCompletionChunk):
+            content = chat_completion.choices[0].delta.content
+            self.llm_text += content if content else ""
+
+        elif isinstance(chat_completion, ChatCompletion):
+            content = chat_completion.choices[0].message.content
+            self.llm_text = content if content else ""
+        
+        if chat_completion.choices[0].finish_reason:
+            self.on_llm_response_completed()

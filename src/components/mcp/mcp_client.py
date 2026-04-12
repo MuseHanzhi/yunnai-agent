@@ -18,8 +18,8 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from src.components.app_config.types import (
-    MCPStdio,
-    MCPStreamableHTTP
+    MCPStdioOption,
+    MCPStreamableHTTPOption
 )
 from .in_memory_token_storage import InMemoryTokenStorage
 from src.components.logger.logger import LogCreator
@@ -33,7 +33,7 @@ OnConnectedHandler = Callable[[], None]
 OnConnectErrorHandler = Callable[[Exception], None]
 logger = LogCreator.instance.create(__name__)
 class MCPClient:
-    def __init__(self, client_info: "ClientInfo", config: Union[MCPStdio, MCPStreamableHTTP]):
+    def __init__(self, client_info: "ClientInfo", config: Union[MCPStdioOption, MCPStreamableHTTPOption]):
         self.session: ClientSession | None = None
         self.client_future: asyncio.Future | None = None
         self.config = config
@@ -45,7 +45,7 @@ class MCPClient:
     async def handle_redirect(auth_url: str) -> None:
         logger.debug(f"redirected: {auth_url}")
     
-    async def connect_streamable_http(self, config: MCPStreamableHTTP):
+    async def connect_streamable_http(self, config: MCPStreamableHTTPOption):
         auth_option = config.get("auth_option")
         if auth_option:
             await self.auth_connect(config)
@@ -96,7 +96,7 @@ class MCPClient:
             return params["code"][0], params.get("state", [None])[0]
         raise Exception("'auth_option'未配置'callback_url'")
 
-    async def auth_connect(self, config: MCPStreamableHTTP):
+    async def auth_connect(self, config: MCPStreamableHTTPOption):
         auth_option = config.get("auth_option")
         if not auth_option or not auth_option.get("callback_url"):
             if self.on_connect_error:
@@ -134,7 +134,7 @@ class MCPClient:
                     await self.client_future
 
     
-    async def connect_stdio(self, config: MCPStdio):
+    async def connect_stdio(self, config: MCPStdioOption):
         try:
             parameters = StdioServerParameters(
                 command=config["cmd"],

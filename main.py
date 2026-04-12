@@ -3,7 +3,6 @@ import sys
 import os
 
 from src.components.app_config import app_config
-from src.plugins.plugin import Plugin
 from src.components.logger.logger import LogCreator
 from src.application import Application
 
@@ -14,30 +13,31 @@ def env_check():
     """
     result = True
 
-    logger.info("开始进行环境检查")
+    logger.info("开始系统环境检查")
     require_evns: list[str] = app_config.config["system"].get("require_env", [])
     for env_name in require_evns:
-        ali_key = os.getenv(env_name)
-        if not ali_key:
+        env_value = os.getenv(env_name)
+        if not env_value:
             result = False
-            logger.warning(f"请配置环境变量'{env_name}'")
-        logger.info(f"'{env_name}'===OK")
+            logger.warning(f"[{env_name}] === FAIL")
+            continue
+        logger.info(f"[{env_name}] === PASS")
     return result
 
-
 def main():
-    main_app.initialize()
+    if not env_check():
+        logger.error("系统环境检查失败")
+        sys.exit(1)
+    main_app = Application(sys.argv[1:])
     sys.exit(main_app.run())
-
+    
 load_dotenv()
+
 app_config.load("./app_config.yaml")
 LogCreator.instance.load_config(app_config.config["logging"])
 
 logger = LogCreator.instance.create(__name__)
-main_app = Application(sys.argv)
 
 if __name__ == '__main__':
-    if not env_check():
-        sys.exit(1)
     main()
-    # test()
+    

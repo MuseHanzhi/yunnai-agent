@@ -27,7 +27,7 @@ class IPCHandler:
         self.event_loop = asyncio.get_event_loop()
     
     def close_app(self, params: dict):
-        self.app.close()
+        self.app.exit()
     
     def _client_ready(self, params: dict):
         # self._init_ai_chat(params)

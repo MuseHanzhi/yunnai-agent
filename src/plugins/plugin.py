@@ -1,25 +1,19 @@
-from typing import (
-    TYPE_CHECKING,
-    Literal
-)
-from openai.types.chat import ChatCompletionChunk
-from src.components.ai_chat.chat_state import ChatState
+import inspect
 from asyncio import AbstractEventLoop
 
+
+from openai.types.chat import ChatCompletionChunk, ChatCompletion
+from src.components.ai_chat.chat_state import ChatState
+from src.types.lfecycle_hooks import Hooks
+
+from typing import (
+    TYPE_CHECKING
+)
 if TYPE_CHECKING:
     from src.application import Application
 
-Hooks = Literal[
-    "on_app_before_initialize",
-    "on_app_after_initialized",
-    "on_llm_response",
-    "on_llm_response_completed",
-    "on_app_will_close",
-    "on_message_before_send",
-    "on_message_after_sended",
-    "on_ready"
-]
 class Plugin:
+    
     def __str__(self) -> str:
         return f"<plguin: {self.name}, ver: {self.version}, desc: {self.desc}>"
 
@@ -28,13 +22,6 @@ class Plugin:
         self.version = version
         self.desc = desc
         self.hook_registry: list[Hooks] = []
-
-    
-    def init(self):
-        """
-        插件初始化时触发
-        """
-        ...
 
     def deinit(self):
         """
@@ -58,21 +45,13 @@ class Plugin:
         """
         ...
     
-    def on_llm_response(self, chunk: ChatCompletionChunk):
+    def on_llm_response(self, chat_completion: ChatCompletionChunk | ChatCompletion):
         """
         大模型响应时触发
         
-        :param content: 回复内容（流式）
-        :type content: ChatCompletionChunk
+        :param chat_completion: 大模型回复的内容
         """
         ...
-    
-    def on_llm_response_completed(self, finish_reason: str):
-        """
-        大模型响应完毕
-        
-        :param finish_reason: 完成原因：后续可能计划移除
-        """
     
     def on_message_before_send(self, state: ChatState):
         """

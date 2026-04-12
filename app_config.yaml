@@ -12,21 +12,21 @@ logging:    # 日志
         debug:
             - 
                 <<: *file_handler
-            - 
-                <<: *console_handler
         error:
             - 
                 <<: *console_handler
             - 
                 <<: *file_handler
 system:     # 系统配置
-    ipc_server:
-        host: "localhost"
-        port: 8866
+    sys_info:
+        name: "yunnai-kernel"
+        version: "2.0.0"
+    ipc_uri: "ws://localhost:5249"
     require_env:
-        - DASHSCOPE_API_KEY
-        - KIMI_API_KEY
-        - DOUAO_API_KEY
+        - "DASHSCOPE_API_KEY"
+        - "KIMI_API_KEY"
+        - "DOUAO_API_KEY"
+    thread_workers: null
 llm:        # 大模型
     default: "Qwen3.6-plus"
     models: 

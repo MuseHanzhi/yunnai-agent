@@ -1,19 +1,26 @@
 from typing import (
-    NotRequired,
-    Required,
     TypedDict,
     Literal,
     Any
 )
 
-class IPCData(TypedDict):
-    id: NotRequired[str]
-    name: Required[str]
-    type: Required[Literal["event", "invoke-res", "invoke-req"]]
-
-class IPCCommand(IPCData):
+class Event(TypedDict):
+    type: Literal['event']
+    name: str
     arguments: dict[str, Any]
 
-class IPCInvokeResult(IPCData):
+class InvokeRequest(TypedDict):
+    id: str
+    name: str
+    type: Literal["invoke-req"]
+    arguments: dict[str, Any]
+
+class InvokeResponse(TypedDict):
+    id: str
+    name: str
+    type: Literal["invoke-res"]
     data: Any
-    exceptMessage: NotRequired[str] | None
+    exceptMessage: str | None
+
+
+IPCData = Event | InvokeRequest | InvokeResponse

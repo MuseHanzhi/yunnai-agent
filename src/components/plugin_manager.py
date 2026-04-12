@@ -1,20 +1,19 @@
 from src.components.logger.logger import LogCreator
-from src.components.app_config.types import PluginConfig, PluginOption
+from src.components.app_config.types import PluginConfigOption, PluginOption
 from src.plugins.plugin import (
-    Hooks,
-    Plugin
+    Plugin,
+    Hooks
 )
 import importlib
 
 logger = LogCreator.instance.create(__name__)
 
 class PluginManager:
-    def __init__(self, config: PluginConfig):
+    def __init__(self):
         self.plugins: dict[str, Plugin] = {}
         self.hook_registry_map: dict[Hooks, list[Plugin]] = {}
-        self.initialize(config)
     
-    def initialize(self, config: PluginConfig):
+    def initialize(self, config: PluginConfigOption):
         base_module = config["base_module"].strip(".")
         plugins: list[PluginOption] = config.get("plugins", [])
         for plugin in plugins:
@@ -50,15 +49,6 @@ class PluginManager:
             # 注册插件
             self.plugins[plugin_class_instance.name] = plugin_class_instance
             logger.info(f"插件'{module_path}'加载完成")
-            
-    
-    def init_plugin(self):
-        for (name, plugin) in self.plugins.items():
-            try:
-                plugin.init()
-                logger.info(f"'{name}' 已就绪")
-            except Exception as e:
-                logger.warning(f"插件 '{name}' 初始化时出现异常: {e}")
             
     
     def remove(self, target: str | Plugin):
@@ -101,4 +91,4 @@ class PluginManager:
             try:
                 getattr(plugin, hook_name)(**arguments)
             except Exception as err:
-                logger.error(f"触发插件'{plugin.name}'的Hook时发生异常", exc_info=err)
+                logger.error(f"触发插件'{plugin.name}' Hook '{hook_name}'时发生异常", exc_info=err)
