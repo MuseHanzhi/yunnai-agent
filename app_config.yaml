@@ -21,11 +21,20 @@ system:     # 系统配置
     sys_info:
         name: "yunnai-kernel"
         version: "2.0.0"
-    ipc_uri: "ws://localhost:5249"
     require_env:
         - "DASHSCOPE_API_KEY"
         - "KIMI_API_KEY"
         - "DOUAO_API_KEY"
+    ipc_option:
+        enable: true
+        protocol: "ws"
+        host: "192.168.1.102"
+        port: 6600
+        reconnect:
+            enable: true
+            retry_interval: 5
+            max_retry: 3
+
     thread_workers: null
 llm:        # 大模型
     default: "Qwen3.6-plus"
@@ -34,6 +43,7 @@ llm:        # 大模型
             name: "qwen3.6-plus"
             key_name: "DASHSCOPE_API_KEY"
             base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            stream: false
         "kimi-k2-thinking":
             name: "kimi-k2-thinking"
             key_name: "KIMI_API_KEY"
@@ -74,9 +84,8 @@ plugin_config:  # 插件配置
     base_module: "src.plugins"
     plugins:
         - 
-            module_path: "session_plugin.session_plugin"
-            class_name: null
-        - 
             module_path: "wxauto_plugin.wxauto_plugin"
             class_name: "WXAutoPlugin"
+        - 
+            module_path: "session_plugin.session_plugin"
 

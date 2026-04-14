@@ -29,6 +29,7 @@ def main():
         logger.error("系统环境检查失败")
         sys.exit(1)
     main_app = Application(sys.argv[1:])
+    main_app.initialize()
     sys.exit(main_app.run())
     
 load_dotenv()

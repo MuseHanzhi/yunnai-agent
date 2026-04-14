@@ -27,8 +27,14 @@ class SysInfo(typing.TypedDict):
     name: str
     version: str
 
+class IPCOption(typing.TypedDict):
+    protocol: str
+    host: str
+    port: int
+    
+
 class SystemOption(typing.TypedDict):
-    ipc_uri: str
+    ipc_option: IPCOption | None
     require_env: list[str]
     thread_workers: int | None
     system_prompt_path: str | None

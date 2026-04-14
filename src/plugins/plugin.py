@@ -1,4 +1,4 @@
-import inspect
+# import inspect
 from asyncio import AbstractEventLoop
 
 
@@ -7,7 +7,8 @@ from src.components.ai_chat.chat_state import ChatState
 from src.types.lfecycle_hooks import Hooks
 
 from typing import (
-    TYPE_CHECKING
+    TYPE_CHECKING,
+    Any
 )
 if TYPE_CHECKING:
     from src.application import Application
@@ -61,7 +62,7 @@ class Plugin:
         """
         ...
     
-    def on_message_after_sended(self):
+    def on_message_after_sended(self, state: ChatState):
         """
         向智能体发送信息后触发
         """
@@ -81,7 +82,7 @@ class Plugin:
         """
         ...
 
-    def emit(self, name: str, arguments: dict):
+    def emit(self, name: str, arguments: dict) -> Any:
         """
         用于插件与插件之间的通信
         :param name: 命令

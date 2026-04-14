@@ -34,7 +34,7 @@ class IPCServer:
         self.invoke_sessions: dict[str, InvokeSession] = {}
         
         # Invoke 超时时间(毫秒)
-        self.invoke_timeout = 30000
+        self.invoke_timeout = 10000
 
         self.invoke_num = 0
         
@@ -254,7 +254,7 @@ class IPCServer:
         }
         await self._send(command)
 
-    async def invoke(self, name: str, **arguments) -> Any:
+    async def invoke(self, name: str, **arguments) -> dict:
         """调用服务端方法并等待响应 (请求/响应模式)
         Args:
             name: 方法名称
@@ -268,12 +268,11 @@ class IPCServer:
         """
         
         if not self.is_connected:
-            logger.warning("没有服务端连接")
-            return
+            raise ConnectionError("IPC 服务端未连接")
         
         self.invoke_num += 1
 
-        if self.invoke_num >= 1000:     
+        if self.invoke_num >= 1000:
             self.invoke_num = 0
 
         invoke_id: str = f"{time.time()}:{name}:{self.invoke_num}"

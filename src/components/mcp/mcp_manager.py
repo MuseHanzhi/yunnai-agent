@@ -1,10 +1,11 @@
 from typing import Any
 import asyncio
 
-from mcp.types import TextContent, Tool
+from mcp.types import Tool
 
 from .mcp_client import MCPClient
 from src.components.app_config.types import MCPOption
+from src.components.logger.logger import LogCreator
 from .types import (
     ClientInfo,
     MCPInfo,
@@ -12,6 +13,8 @@ from .types import (
     GetToolResult
 )
 
+
+logger = LogCreator().instance.create(__name__)
 class MCPManager:
     def __init__(self):
         self.mcp_servers: list[dict[str, str]] = []
@@ -39,6 +42,7 @@ class MCPManager:
                 "name": mcp_name,
                 "desc": mcp_server["desc"]
             })
+            logger.info(f"'{mcp_name}'加载完成")
     
     async def activate(self, mcp_name: str) -> GetToolResult:
         """
@@ -94,6 +98,7 @@ class MCPManager:
         mcp_info["client"].disconnect()
     
     async def call_tool(self, mcp_name: str, tool_name: str, arguments: dict[str, Any] | None = None) -> CallResult:
+        logger.info(f"调用MCP '{mcp_name}' 工具 '{tool_name}' 参数 '{arguments}'")
         session = self.mcp_infos[mcp_name]["session"]
         if not session:
             return {
@@ -101,12 +106,21 @@ class MCPManager:
                 "is_error": True,
                 "content": None
             }
-        call_result = await session.call_tool(tool_name, arguments)
-        return {
-            "message": "OK",
-            "is_error": call_result.isError,
-            "content": call_result.content
-        }
+        try:
+            call_result = await session.call_tool(tool_name, arguments)
+            logger.info(f"调用MCP '{mcp_name}' 工具 '{tool_name}' 结果 '{ 'ERROR' if call_result.isError else 'OK' }'")
+            return {
+                "message": "OK",
+                "is_error": call_result.isError,
+                "content": call_result.content
+            }
+        except Exception as ex:
+            logger.error(f"调用MCP '{mcp_name}' 错误: {ex}", exc_info=ex)
+            return {
+                "message": "ERROR",
+                "is_error": True,
+                "content": None
+            }
 
     async def get_mcp_session(self, mcp_name: str):
         session = self.mcp_infos[mcp_name]["session"]

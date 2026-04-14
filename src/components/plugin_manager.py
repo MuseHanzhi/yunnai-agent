@@ -5,6 +5,7 @@ from src.plugins.plugin import (
     Hooks
 )
 import importlib
+from typing import Any
 
 logger = LogCreator.instance.create(__name__)
 
@@ -29,7 +30,7 @@ class PluginManager:
                     plugin_class_name = "".join([f"{item[0].upper()}{item[1:]}" for item in module_path.split(".")[-2].split("_") if item])
                 plugin_class_instance = getattr(module, plugin_class_name)()
             except TypeError:
-                logger.warning(f"插件类'{plugin_class_name}'找不到无参构造函数 - 跳过加载")
+                logger.warning(f"找不到'{module}'插件主类 - 跳过加载")
                 continue
             except IndexError:
                 logger.warning(f"插件插件模块路径'{module_path}'无效 - 跳过加载")
@@ -78,11 +79,11 @@ class PluginManager:
     def get_plugin(self, name: str) -> None | Plugin:
         return self.plugins.get(name)
 
-    def emit(self, plugin_name: str, name: str, arguments: dict = {}):
+    def emit(self, plugin_name: str, name: str, arguments: dict = {}) -> Any:
         plugin = self.plugins.get(plugin_name)
         if plugin is None:
             raise Exception(f"没有名为 '{plugin_name}' 的插件")
-        plugin.emit(name, arguments)
+        return plugin.emit(name, arguments)
 
 
     def trigger(self, hook_name: Hooks, **arguments):

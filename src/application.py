@@ -3,7 +3,10 @@ import asyncio
 import typing
 import os
 
-from openai.types.chat import ChatCompletionChunk
+from openai.types.chat import (
+    ChatCompletionChunk,
+    ChatCompletion
+)
 
 from src.components.mcp.mcp_manager import MCPManager
 from src.components.ai_chat import AIChat, ChatState
@@ -20,14 +23,18 @@ class Application:
 
     - 异步事件循环  : 完成度(100%)
     - 触发插件Hooks : 完成度(100%)
-    - ipc服务 : 完成度(85%)，生命周期hook需要接收结果
+    - ipc服务 : 完成度(100%)
     - ipc处理 : 完成度(50%)
     - LLM       : 完成度(100%)
     - MCP       : 模块编写完成，Stdio、StreamableHttp测试成功，OAuth未测试，完成度(90%)
-    - Skills    : 计划完成MCP后开工
-    - 插件管理  : 完成度(100%)
+    - Skills    : 完成度(0%) 计划完成MCP后开工
+    - 插件管理  : 完成度(100%) 后续计划支持装饰器声明和设置触发顺序
     """
     def __init__(self, args: list[str]):
+        # 基础属性
+        self.thread_executor = ThreadPoolExecutor(app_config.config["system"].get("thread_workers"))
+        self.event_loop = asyncio.new_event_loop()
+        self.ipc_available = False
         # 配置
         self.launch_args: dict[str, str] = Application._parse_args(args)
         self.llm_config = Application._get_llm(app_config.config["llm"]["default"])
@@ -39,12 +46,9 @@ class Application:
         self.mcp_manager: MCPManager | None = Application._load_mcp_component()
         self.ipc = IPCServer()
         self.ipc_handler = IPCHandler(self)
-        self.thread_executor = ThreadPoolExecutor(app_config.config["system"].get("thread_workers"))
-        self.event_loop = asyncio.new_event_loop()
         
         # 全局变量
         self.completed_text = ""
-        self.ipc_available = self.launch_args.get("ipc_uri", app_config.config["system"].get("ipc_uri"))
     
     @staticmethod
     def _load_ai_client_component():
@@ -95,7 +99,7 @@ class Application:
             "base_url": llm_config["base_url"],
             "api_key": api_key,
             "name": llm_config["name"],
-            "stream": llm_config.get("stream", False)
+            "stream": llm_config.get("stream", True)
         }
     
     def exit(self):
@@ -136,10 +140,16 @@ class Application:
         # 异步事件循环
         asyncio.set_event_loop(self.event_loop)
 
-        ipc_uri = self.launch_args.get("ipc_uri", app_config.config["system"].get("ipc_uri"))
+        ipc_uri = self.launch_args.get("ipc_uri")
         if not ipc_uri:
-            logger.warning("ipc websocket uri未配置，跳过IPC组件")
-        else:
+            ipc_option = app_config.config["system"].get("ipc_option")
+            if ipc_option:
+                ipc_uri = f"{ipc_option['protocol']}://{ipc_option['host']}:{ipc_option['port']}"
+                self.ipc_available = True
+            else:
+                logger.warning("ipc websocket uri未配置，跳过IPC组件")
+                
+        if ipc_uri:
             logger.info("初始化IPC组件")
             self.ipc.on_ipc_ready = self.ipc_ready_handle
             self.ipc.on_ipc_error = self.ipc_error_handle
@@ -163,40 +173,63 @@ class Application:
             )
         logger.info("初始化应用程序完毕")
     
-    def on_response(self, chunk: ChatCompletionChunk):
+    def on_response(self, chunk: ChatCompletionChunk | ChatCompletion):
         self.plugin_manager.trigger(
                 "on_llm_response",
-                chunk = chunk
+                chat_completion = chunk
             )
         if self.ipc.is_connected:
             self.event_loop.create_task(self.ipc.emit("on_llm_response", chunk=chunk.model_dump()))
     
-    def _start_response(self, state: ChatState):
+    async def _start_response(self, state: ChatState):
         if state.is_stream:
-            for chunk in self.ai_client.stream_response(state):
-                self.on_response(chunk)
+            try:
+                async for chunk in self.ai_client.stream_response(state):
+                    self.on_response(chunk)
+            except Exception as ex:
+                logger.info(f"大模型响应时出现异常: {ex}", exc_info=ex)
         else:
-            chunk = self.ai_client.non_stream_response(state)
-            self.on_response(chunk)
+            try:
+                completion: ChatCompletion = await self.ai_client.non_stream_response(state)
+                self.on_response(completion)
+            except Exception as ex:
+                logger.info(f"大模型响应时出现异常: {ex}", exc_info=ex)
     
     async def send_message(self, message: str, msg_type: typing.Literal["user", "system"] = "user"):
-        state = self.ai_client.create_state(self.llm_config.get("stream", True))    # 默认流式
+        state = self.ai_client.create_state({
+            "role": "user",
+            "content": [
+                    {
+                        "type": "text",
+                        "text": message
+                    }
+                ]
+            },
+            self.llm_config.get("stream", True)
+        )    # 默认流式
         state.msg_type = msg_type
-        state.user_input = message
         self.plugin_manager.trigger("on_message_before_send", state=state)
         if self.ipc.is_connected:
-            await self.ipc.emit("on_message_before_send")
+            try:
+                new_state = await self.ipc.invoke("on_message_before_send", state=state.to_dict())
+                state.change_from_dict(new_state["state"])
+            except Exception as ex:
+                logger.error(f"ipc call except: {ex}", exc_info=ex)
         
         if state.canceled:
             return
-        self.event_loop.run_in_executor(None, self._start_response, (state))    # 不要阻塞
+        
+        self.event_loop.create_task(self._start_response(state))
 
-        self.plugin_manager.trigger("on_message_after_sended")
+        self.plugin_manager.trigger("on_message_after_sended", state=state)
         if self.ipc.is_connected:
-            await self.ipc.emit("on_message_after_sended")
+            try:
+                new_state = await self.ipc.invoke("on_message_after_sended", state=state.to_dict())
+                state.change_from_dict(new_state["state"])
+            except Exception as ex:
+                logger.error(f"ipc call except: {ex}", exc_info=ex)
 
     def run(self):
-        self.initialize()
         try:
             if not self.ipc_available:
                 self.plugin_manager.trigger("on_ready")
