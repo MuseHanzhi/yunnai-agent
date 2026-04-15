@@ -1,9 +1,5 @@
 from openai.types.chat import ChatCompletionMessageParam
-from typing import Any, Literal, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .base_adapter import BaseAdapter
-
+from typing import Any, Literal
 
 class ChatState:
     def __init__(self, model_name: str, message: ChatCompletionMessageParam, messages: list[ChatCompletionMessageParam] | None = None, is_stream: bool = True):
@@ -16,7 +12,11 @@ class ChatState:
         self.fixed_sys_prompt = ""
         self.msg_type: Literal["user", "system"] = "user"
         self.type: Literal["agent", "chat"] = "chat"
+        self.mcp_list: list[dict] = []
         self.message: ChatCompletionMessageParam = message
+    
+    def set_mcp_list(self, mcp_list: list[dict]):
+        self.mcp_list = mcp_list
     
     def to_dict(self) -> dict:
         return {

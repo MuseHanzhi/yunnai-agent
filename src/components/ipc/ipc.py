@@ -1,4 +1,5 @@
 from typing import Callable, Any, Optional, TypedDict
+import inspect
 import asyncio
 import json
 import time
@@ -101,7 +102,10 @@ class IPCServer:
         if event_name in self.event_handlers:
             for callback in self.event_handlers[event_name]:
                 try:
-                    callback(arguments)
+                    result = callback(arguments)
+                    # 处理异步回调
+                    if asyncio.iscoroutine(result):
+                        asyncio.get_event_loop().create_task(result)
                 except Exception as e:
                     logger.error(f"事件处理器执行失败 ({event_name}): {e}", exc_info=True)
         else:
@@ -119,7 +123,7 @@ class IPCServer:
             'exceptMessage': None
         }
         
-        handler = self.invoke_handlers.get(data["id"])
+        handler = self.invoke_handlers.get(data["name"])
         
         if not handler:
             result_data['exceptMessage'] = f"NoHandler: '{data['name']}' 该invokeIPC客户端未注册"
@@ -127,9 +131,8 @@ class IPCServer:
             return
         
         try:
-            # 执行处理器
+            # 执行方法处理
             result = handler(arguments)
-            
             # 处理异步结果
             if asyncio.iscoroutine(result):
                 result = await result

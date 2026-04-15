@@ -19,7 +19,6 @@ class MCPManager:
     def __init__(self):
         self.mcp_servers: list[dict[str, str]] = []
         self.mcp_infos: dict[str, MCPInfo] = {}
-        self.tools: dict[str, list[Tool]] = {}
 
     def is_activate(self, mcp_name: str):
         mcp_info = self.mcp_infos.get(mcp_name)
@@ -36,7 +35,8 @@ class MCPManager:
             self.mcp_infos[mcp_name] = {
                 "name": mcp_name,
                 "session": None,
-                "client": MCPClient(client_info, mcp_server)
+                "client": MCPClient(client_info, mcp_server),
+                "tools": []
             }
             self.mcp_servers.append({
                 "name": mcp_name,
@@ -56,11 +56,10 @@ class MCPManager:
         session = mcp_info.get("session")
 
         if session:
-            tools = await session.list_tools()
             return {
                 "message": "OK",
                 "is_error": False,
-                "tools": tools.tools
+                "tools": mcp_info["tools"]
             }
 
         event_loop = asyncio.get_running_loop()
@@ -86,7 +85,7 @@ class MCPManager:
         session = client.get_session()
         self.mcp_infos[mcp_name]["session"] = session
         tools = (await session.list_tools()).model_dump()["tools"]
-        self.tools[mcp_name] = tools
+        mcp_info["tools"] = tools
         return {
             "message": "OK",
             "is_error": False,
@@ -122,8 +121,8 @@ class MCPManager:
                 "content": None
             }
 
-    async def get_mcp_session(self, mcp_name: str):
+    def get_mcp_session(self, mcp_name: str):
         session = self.mcp_infos[mcp_name]["session"]
         if not session:
-            return ConnectionError(f"MCP '{mcp_name}' 未激活")
+            raise ConnectionError(f"MCP '{mcp_name}' 未激活")
         return session

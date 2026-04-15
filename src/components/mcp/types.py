@@ -17,6 +17,7 @@ class MCPInfo(TypedDict):
     name: str
     session: ClientSession | None
     client: "MCPClient"
+    tools: list[Tool]
 
 class GetToolResult(TypedDict):
     message: str

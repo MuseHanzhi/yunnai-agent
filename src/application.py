@@ -206,7 +206,11 @@ class Application:
                 ]
             },
             self.llm_config.get("stream", True)
-        )    # 默认流式
+        )
+        # 自动注入MCP列表
+        if self.mcp_manager and app_config.config["capabilities"]["mcp"]["enable"] and app_config.config["capabilities"]["mcp"]["auto_inject"]:
+            state.set_mcp_list(self.mcp_manager.mcp_servers)
+            
         state.msg_type = msg_type
         self.plugin_manager.trigger("on_message_before_send", state=state)
         if self.ipc.is_connected:

@@ -62,11 +62,13 @@ class MCPStdioOption(typing.TypedDict):
     env: dict[str, str] | None
 
 class MCPOption(typing.TypedDict):
+    auto_inject: bool
     enable: bool
     servers: dict[str, typing.Union[MCPStreamableHTTPOption, MCPStdioOption]] | None
 
 ## skills
 class SkillsOption(typing.TypedDict):
+    auto_inject: bool
     enable: bool
     base_path: str
 

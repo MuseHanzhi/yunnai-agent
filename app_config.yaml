@@ -25,15 +25,15 @@ system:     # 系统配置
         - "DASHSCOPE_API_KEY"
         - "KIMI_API_KEY"
         - "DOUAO_API_KEY"
-    ipc_option:
-        enable: true
-        protocol: "ws"
-        host: "192.168.1.102"
-        port: 6600
-        reconnect:
-            enable: true
-            retry_interval: 5
-            max_retry: 3
+    ipc_option: null
+        # enable: true
+        # protocol: "ws"
+        # host: "192.168.1.102"
+        # port: 6600
+        # reconnect:
+        #     enable: true
+        #     retry_interval: 5
+        #     max_retry: 3
 
     thread_workers: null
 llm:        # 大模型
@@ -54,6 +54,7 @@ llm:        # 大模型
             base_url: "https://ark.cn-beijing.volces.com/api/v3"
 capabilities:   # 能力
     mcp:    # MCP
+        auto_inject: true
         enable: true
         servers:
             "wxauto":
@@ -77,6 +78,7 @@ capabilities:   # 能力
                 headers:
                     "Authorization": "Bearer ${DASHSCOPE_API_KEY}"
     skills: # Agent Skills
+        auto_inject: true
         enable: true
         skills_paths:
             - "./skills"

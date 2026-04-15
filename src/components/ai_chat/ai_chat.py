@@ -37,11 +37,25 @@ class AIChat:
             ]
         }
 
+        mcp_prompt = ""
+
+        if state.mcp_list:
+            mcp_prompt = f"""
+工具集(MCP)
+{
+    "\n".join([
+        f"{mcp['name']}：{mcp['desc']}"
+        for mcp in state.mcp_list
+    ])
+}
+
+"""
+
         if state.dynamic_sys_prompt:
             # 动态prompt，一些附加信息，比如MCP列表、技能列表、系统信息、时间信息等
             params["messages"].append({
                 "role": "system",
-                "content": state.dynamic_sys_prompt
+                "content": state.dynamic_sys_prompt + mcp_prompt
             })
         # 要求大模型响应的信息
         if state.message:
