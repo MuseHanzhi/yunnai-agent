@@ -12,8 +12,6 @@ from src.components.mcp.mcp_manager import MCPManager
 from src.components.ai_chat import AIChat, ChatState
 from src.components.plugin_manager import PluginManager
 from src.components.logger.logger import LogCreator
-from src.components.ipc.ipc import IPCServer
-from src.components.ipc_handlers.ipc_handler import IPCHandler
 from src.components.app_config import app_config
 
 logger = LogCreator.instance.create(__name__)
@@ -23,8 +21,6 @@ class Application:
 
     - 异步事件循环  : 完成度(100%)
     - 触发插件Hooks : 完成度(100%)
-    - ipc服务 : 完成度(100%)
-    - ipc处理 : 完成度(50%)
     - LLM       : 完成度(100%)
     - MCP       : 模块编写完成，Stdio、StreamableHttp测试成功，OAuth未测试，完成度(90%)
     - Skills    : 完成度(0%) 计划完成MCP后开工
@@ -34,7 +30,6 @@ class Application:
         # 基础属性
         self.thread_executor = ThreadPoolExecutor(app_config.config["system"].get("thread_workers"))
         self.event_loop = asyncio.new_event_loop()
-        self.ipc_available = False
         # 配置
         self.launch_args: dict[str, str] = Application._parse_args(args)
         self.llm_config = Application._get_llm(app_config.config["llm"]["default"])
@@ -44,8 +39,6 @@ class Application:
         self.plugin_manager = PluginManager()
         self.ai_client: AIChat = Application._load_ai_client_component()
         self.mcp_manager: MCPManager | None = Application._load_mcp_component()
-        self.ipc = IPCServer()
-        self.ipc_handler = IPCHandler(self)
         
         # 全局变量
         self.completed_text = ""
@@ -103,9 +96,6 @@ class Application:
         }
     
     def exit(self):
-        if self.ipc.is_connected:
-            self.event_loop.run_until_complete(self.ipc.emit("on_app_will_close"))
-            self.event_loop.run_until_complete(self.ipc.close())
         self.event_loop.stop()
         # event_loop.close()
     
@@ -117,44 +107,12 @@ class Application:
             )
         except Exception as ex:
             raise ex
-    
-    def ipc_ready_handle(self):
-        self.event_loop.create_task(self.ipc.emit("on_ready"))
-        self.plugin_manager.trigger("on_ready")
-        logger.info(f"IPC WebSocket已连接到'{self.ipc.ipc_uri}'")
-        logger.info("初始化IPC组件 - OK")
-
-        logger.info("初始化IPC处理函数")
-        self.ipc_handler.init()
-        logger.info("初始化IPC处理函数 - OK")
-    
-    def ipc_error_handle(self, ex: Exception):
-        self.plugin_manager.trigger("on_ready")
-        logger.error("ipc连接失败: {ex}", exc_info=ex)
-        logger.error(f"IPC启动失败: {ex}", exc_info=ex)
-        logger.info("初始化IPC组件 - FAILED")
 
     def initialize(self):
         logger.info("开始初始化应用程序")
 
         # 异步事件循环
         asyncio.set_event_loop(self.event_loop)
-
-        ipc_uri = self.launch_args.get("ipc_uri")
-        if not ipc_uri:
-            ipc_option = app_config.config["system"].get("ipc_option")
-            if ipc_option:
-                ipc_uri = f"{ipc_option['protocol']}://{ipc_option['host']}:{ipc_option['port']}"
-                self.ipc_available = True
-            else:
-                logger.warning("ipc websocket uri未配置，跳过IPC组件")
-                
-        if ipc_uri:
-            logger.info("初始化IPC组件")
-            self.ipc.on_ipc_ready = self.ipc_ready_handle
-            self.ipc.on_ipc_error = self.ipc_error_handle
-            self.ipc.initialize(ipc_uri)
-            self.event_loop.create_task(self.ipc.start())
         
         logger.info("初始化插件")
         self.plugin_manager.initialize(app_config.config["plugin_config"])
@@ -173,25 +131,23 @@ class Application:
             )
         logger.info("初始化应用程序完毕")
     
-    def on_response(self, chunk: ChatCompletionChunk | ChatCompletion):
-        self.plugin_manager.trigger(
-                "on_llm_response",
-                chat_completion = chunk
-            )
-        if self.ipc.is_connected:
-            self.event_loop.create_task(self.ipc.emit("on_llm_response", chunk=chunk.model_dump()))
-    
     async def _start_response(self, state: ChatState):
         if state.is_stream:
             try:
                 async for chunk in self.ai_client.stream_response(state):
-                    self.on_response(chunk)
+                    self.plugin_manager.trigger(
+                        "on_llm_response",
+                        chat_completion = chunk
+                    )
             except Exception as ex:
                 logger.info(f"大模型响应时出现异常: {ex}", exc_info=ex)
         else:
             try:
                 completion: ChatCompletion = await self.ai_client.non_stream_response(state)
-                self.on_response(completion)
+                self.plugin_manager.trigger(
+                    "on_llm_response",
+                    chat_completion = completion
+                )
             except Exception as ex:
                 logger.info(f"大模型响应时出现异常: {ex}", exc_info=ex)
     
@@ -213,30 +169,15 @@ class Application:
             
         state.msg_type = msg_type
         self.plugin_manager.trigger("on_message_before_send", state=state)
-        if self.ipc.is_connected:
-            try:
-                new_state = await self.ipc.invoke("on_message_before_send", state=state.to_dict())
-                state.change_from_dict(new_state["state"])
-            except Exception as ex:
-                logger.error(f"ipc call except: {ex}", exc_info=ex)
-        
         if state.canceled:
             return
         
         self.event_loop.create_task(self._start_response(state))
-
         self.plugin_manager.trigger("on_message_after_sended", state=state)
-        if self.ipc.is_connected:
-            try:
-                new_state = await self.ipc.invoke("on_message_after_sended", state=state.to_dict())
-                state.change_from_dict(new_state["state"])
-            except Exception as ex:
-                logger.error(f"ipc call except: {ex}", exc_info=ex)
 
     def run(self):
         try:
-            if not self.ipc_available:
-                self.plugin_manager.trigger("on_ready")
+            self.plugin_manager.trigger("on_ready")
             logger.info("开启事件循环")
             self.event_loop.run_forever()
         except KeyboardInterrupt:

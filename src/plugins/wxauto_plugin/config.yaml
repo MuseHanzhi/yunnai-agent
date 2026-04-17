@@ -5,24 +5,24 @@ oss:
     region: "cn-beijing"
     bucket: "yunnai-agent-oss"
 agent:
-    prompt_path: "./prompts/chat.md"
+    prompt_path:
+        chat: "./prompts/chat.md"
 listen:
     - 
         nickname: "慕色寒枝"
         event_type: "friend"
         msg_types:
             - "text"
-            - "voice"
             - "image"
-            - "emotion"
             - "system"
     -
-        nickname: "LIOUA"
+        nickname: "相亲相爱一家人"
+        metadata:
+            type: "group"
+            main_user: "慕色寒枝"
         event_type: "friend"
         msg_types: 
             - "text"
             - "voice"
-            - "image"
-            - "emotion"
-            - "system"
+            - "quote"
     

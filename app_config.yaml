@@ -25,15 +25,6 @@ system:     # 系统配置
         - "DASHSCOPE_API_KEY"
         - "KIMI_API_KEY"
         - "DOUAO_API_KEY"
-    ipc_option: null
-        # enable: true
-        # protocol: "ws"
-        # host: "192.168.1.102"
-        # port: 6600
-        # reconnect:
-        #     enable: true
-        #     retry_interval: 5
-        #     max_retry: 3
 
     thread_workers: null
 llm:        # 大模型
@@ -90,4 +81,7 @@ plugin_config:  # 插件配置
             class_name: "WXAutoPlugin"
         - 
             module_path: "session_plugin.session_plugin"
+        - 
+            module_path: "ipc_plugin.ipc_plugin"
+            class_name: "IPCPlugin"
 

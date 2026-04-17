@@ -23,7 +23,7 @@ class InvokeSession(TypedDict):
 
 class IPCServer:
     def __init__(self, uri: str | None = None):
-        self.websocket_conn: BaseTransport = WebSocketTransport()
+        self.websocket_conn: BaseTransport = WebSocketTransport(uri)
         self.ipc_uri = uri
         
         # 事件处理器: name -> list[handler]

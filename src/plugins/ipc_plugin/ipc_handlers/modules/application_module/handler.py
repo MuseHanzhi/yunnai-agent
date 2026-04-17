@@ -5,14 +5,15 @@ from typing import (
     Any
 )
 from .types import *
+from ....ipc.ipc import IPCServer
 
 if TYPE_CHECKING:
     from src.application import Application
 
 class Handler:
-    def __init__(self, app: "Application"):
+    def __init__(self, app: "Application", ipc: IPCServer):
         self.app = app
-        self.ipc = app.ipc
+        self.ipc = ipc
         self.event_loop: asyncio.AbstractEventLoop = app.event_loop
         self.init()
     

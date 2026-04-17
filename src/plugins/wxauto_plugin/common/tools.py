@@ -1,9 +1,10 @@
 import yaml
 from os import path
+from ..types import *
 
 root_path = path.join(path.dirname(__file__), "..")
 
-def parse_yaml(file_path):
+def parse_yaml(file_path) -> Config:
     with open(path.join(root_path, file_path), 'r', encoding='utf-8') as file:
         data = yaml.safe_load(file)
     return data

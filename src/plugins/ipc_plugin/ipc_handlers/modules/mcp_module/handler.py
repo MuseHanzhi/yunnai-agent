@@ -1,7 +1,7 @@
 from mcp.types import Tool, PaginatedRequestParams
 
 from src.components.mcp.mcp_manager import MCPManager
-from src.components.ipc.ipc import IPCServer
+from src.plugins.ipc_plugin.ipc.ipc import IPCServer
 
 from.types import *
 

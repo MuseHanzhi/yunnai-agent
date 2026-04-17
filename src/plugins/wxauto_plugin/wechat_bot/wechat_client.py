@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 
 from mcp.types import TextContent
-from openai.types.chat import ChatCompletionChunk, ChatCompletionContentPartParam
+from openai.types.chat import ChatCompletionContentPartParam
 from wxautox4.msgs import (
     BaseMessage,
     TextMessage,
@@ -17,16 +17,16 @@ from wxautox4.msgs import (
 from wxautox4 import WeChat, Chat
 
 from src.common import public_tools
-from ..common import tools
 from .wechat_event import WeChatEvent
 from src.components.logger.logger import LogCreator
 from src.components.ai_chat.chat_state import ChatState
+
 from ..services.oss_service import OSSService
+from ..common import tools
+from ..types import *
 
 from typing import(
-    Iterator,
     TypedDict,
-    Literal,
     Any,
     TYPE_CHECKING
 )
@@ -34,10 +34,9 @@ from typing import(
 if TYPE_CHECKING:
     from src.application import Application
 
-class Operate(TypedDict):
-    name: Literal["send", "recall"]
-    id: str
-    message: str | None
+class Message(TypedDict):
+    sender: str
+    content: str
 
 class TaskUnit(TypedDict):
     name: str
@@ -51,15 +50,18 @@ class WeChatClient(WeChat):
         self.wechat_event = WeChatEvent(self)
         self.ready = False
         
-        self.config: dict = tools.parse_yaml("./config.yaml")
+        self.config: Config = tools.parse_yaml("./config.yaml")
         self.app: "Application | None" = None
         self.future: asyncio.Future | None = None
         self.oss_service = OSSService(self.config["oss"])
-        self.send_messages: list[Operate] = []
+        self.send_messages: list[Message] = []
         self.handling = False
         self.results: dict[str, asyncio.Future] = {}
         self._lock = threading.Lock()
         self.img_urls = []
+
+        # 群员: 消息列表
+        self.who_metadata: dict[str, dict] = {}
     
     def deinit(self):
         self.results = {}
@@ -82,24 +84,59 @@ class WeChatClient(WeChat):
     
     def on_wechat_message(self, message, chat: Chat):
         logger.info(f"接收到{chat.who}的消息: {message}")
-        operate: Operate = {
-            "name": "send",
-            "id": "",
-            "message": None
+        if not isinstance(message, HumanMessage):    
+            return
+        t_message: Message = {
+            "sender": message.sender,
+            "content": ""
         }
-        if isinstance(message, VoiceMessage) and isinstance(message, HumanMessage):
+
+        if isinstance(message, VoiceMessage):
             text = message.to_text()
-            operate["message"] = text
-            operate["id"] = message.id
-            message.click()
+            metadata = self.who_metadata.get(chat.who, {"type": "private"})
+            chat_type = metadata["type"]
+            if chat_type == "group":
+                interest_members = metadata.get("interest_members", [])
+                if interest_members and message.sender not in interest_members:
+                    return
+                t_message["content"] = f"<群聊[{chat.who}] 用户: {message.sender}>: {text}"
+            else:
+                t_message["content"] = text
+            # message.click()
         elif isinstance(message, TextMessage):
             text = message.content
-            operate["message"] = text
-            operate["id"] = message.id
+            metadata = self.who_metadata.get(chat.who, {"type": "private"})
+            chat_type = metadata["type"]
+            if chat_type == "group":
+                interest_members = metadata.get("interest_members", [])
+                if interest_members and message.sender not in interest_members:
+                    return
+                t_message["content"] = f"<群聊[{chat.who}] 用户: {message.sender}>: {text}"
+            else:
+                t_message["content"] = text
         elif isinstance(message, EmotionMessage):
-            text = f"[发送了一张表情包: {message.content}]"
-            operate["message"] = text
-            operate["id"] = message.id
+            text = f"[发送了一个表情: {message.content}]"
+            metadata = self.who_metadata.get(chat.who, {"type": "private"})
+            chat_type = metadata["type"]
+            if chat_type == "group":
+                interest_members = metadata.get("interest_members", [])
+                if interest_members and message.sender not in interest_members:
+                    return
+                t_message["content"] = f"<群聊[{chat.who}] 用户: {message.sender}>: {text}"
+            else:
+                t_message["content"] = text
+        elif isinstance(message, HumanMessage) and message.type == "quote":
+            text = message.content
+            text = message.content
+            metadata = self.who_metadata.get(chat.who, {"type": "private"})
+            chat_type = metadata["type"]
+            if chat_type == "group":
+                interest_members = metadata.get("interest_members", [])
+                if interest_members and message.sender not in interest_members:
+                    return
+                t_message["content"] = f"<群聊[{chat.who}] 用户[{message.sender}] 对 [{message.quote_nickname}] 发送的:{message.quote_content} 进行了回复>: {text}"
+            else:
+                t_message["content"] = f"<用户[{message.sender}] 对 [{message.quote_nickname}] 发送的:{message.quote_content} 进行了回复>: {text}"
         elif isinstance(message, ImageMessage):
             logger.info("接收到图片消息")
             try:
@@ -122,9 +159,7 @@ class WeChatClient(WeChat):
         with self._lock:
             if not self.handling:
                 self.handling = True
-                
-
-                self.send_messages.append(operate)
+                self.send_messages.append(t_message)
                 # 关键修改：不要在这里 asyncio.run
                 # 而是将处理任务提交给 app 的主事件循环
                 if self.app and self.app.event_loop:
@@ -136,7 +171,7 @@ class WeChatClient(WeChat):
                         self.app.event_loop
                     )
             else:
-                self.send_messages.append(operate)
+                self.send_messages.append(t_message)
     async def _handle_message_flow(self, original_message: BaseMessage, chat: Chat):
         """
         在主事件循环中运行的消息处理入口
@@ -262,8 +297,8 @@ id: {id}
         
         msgs = []
         for item in current_messages:
-            if item["message"]:
-                msgs.append(item["message"])
+            if item["content"]:
+                msgs.append(item["content"])
         combined_text = '\n'.join(msgs)
         user_msg = f"(发送时间:{datetime.now().strftime('%Y-%m-%d %H:%M')}): {combined_text}"
         
@@ -340,6 +375,17 @@ id: {id}
             msg_types = listen_item.get("msg_types", [])
             event_listener = f"{event_type}/{','.join(msg_types)}:{nickname}"
             self.wechat_event.add_listen(event_listener, self.on_wechat_message)
+
+            self.who_metadata[nickname] = {"type": "private"}
+            listen_metadata = listen_item.get("metadata")
+            if listen_metadata is None:
+                continue
+            listen_type = listen_metadata.get("type", "private")
+            self.who_metadata[nickname]["type"] = listen_type
+            if listen_metadata.get("main_user"):
+                self.who_metadata[nickname]["main_user"] = listen_metadata.get("main_user")
+            if listen_type == "group":
+                self.who_metadata[nickname]["interest_members"] = listen_metadata.get("interest_members", [])
             logger.info(f"监听事件: {event_listener}")
 
     def init(self, app: "Application"):

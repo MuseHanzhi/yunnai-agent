@@ -2,9 +2,10 @@ import alibabacloud_oss_v2 as oss
 import uuid
 from pathlib import Path
 from datetime import datetime
+from ..types import OSSOption
 
 class OSSService:
-    def __init__(self, config: dict):
+    def __init__(self, config: OSSOption):
         self.config = config
 
     def gerenate_presigned_url(self, key: str) -> str | None:
@@ -17,7 +18,7 @@ class OSSService:
         # 生成下载链接
         pre_result = client.presign(
             oss.GetObjectRequest(
-                bucket=self.config["bucket_name"],
+                bucket=self.config["bucket"],
                 key=key
             )
         )
@@ -36,7 +37,7 @@ class OSSService:
         with open(file_path, "rb") as f:
             result = client.put_object(
                 oss.PutObjectRequest(
-                    bucket=self.config["bucket_name"],
+                    bucket=self.config["bucket"],
                     key=file_name,
                     body=f
                 )
