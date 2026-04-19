@@ -8,6 +8,7 @@ from src.common import public_tools
 from src.plugins.plugin import Plugin
 from src.components.logger.logger import LogCreator
 from .wechat_bot.wechat_client import WeChatClient
+from src.plugins.hook_registry import registry
 
 if typing.TYPE_CHECKING:
     from src.application import Application
@@ -16,22 +17,17 @@ logger = LogCreator.instance.create(__name__)
 
 class WXAutoPlugin(Plugin):
     def __init__(self):
-        super().__init__("wechat-plugin")
+        super().__init__()
         self.client: None | WeChatClient = None
         self.llm_text = ""
         self.app: "Application | None" = None
-        self.hook_registry = [
-            "on_app_before_initialize",
-            "on_llm_response",
-            "on_message_before_send",
-            "on_ready"
-        ]
     
-    def on_app_before_initialize(self, app: "Application", event_loop: asyncio.AbstractEventLoop):
+    @registry.on_app_before_initialize()
+    def on_app_before_initialize(self, app: "Application"):
         self.app = app
         self.client = WeChatClient()
 
-    
+    @registry.on_ready()
     def on_ready(self):
         if not self.client or not self.app:
             logger.warning("WxAuto客户端或者主程序为空")
@@ -55,11 +51,14 @@ class WXAutoPlugin(Plugin):
             return
         finally:
             self.llm_text = ""
+    
+    @registry.on_message_before_send()
     def on_message_before_send(self, state: ChatState):
         if not self.client or not self.client.ready:
             return
         self.client.on_message_before_send(state)
 
+    @registry.on_llm_response()
     def on_llm_response(self, chat_completion: "ChatCompletionChunk | ChatCompletion"):
         if not chat_completion.choices:
             logger.warning("大模型响应为空")

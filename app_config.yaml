@@ -19,12 +19,19 @@ logging:    # 日志
                 <<: *file_handler
 system:     # 系统配置
     sys_info:
-        name: "yunnai-kernel"
-        version: "2.0.0"
+        name: "yunnai-core"
+        version: "1.0.0"
     require_env:
         - "DASHSCOPE_API_KEY"
         - "KIMI_API_KEY"
         - "DOUAO_API_KEY"
+    ipc:
+        enable: false
+        uri: "ws://192.168.1.105:8866"
+        reconnect:
+            enable: true
+            retry_interval: 5
+            max_retry: 3
 
     thread_workers: null
 llm:        # 大模型
@@ -55,13 +62,12 @@ capabilities:   # 能力
                 args: 
                     - "-m"
                     - "wxauto_mcp.server"
-            "time":
+            "mcd-mcp":
                 enable: true
-                desc: "间与时区管理服务，用于获取系统或全球各地的当前时间，并在不同 IANA 时区之间进行精确转换，适用于跨时区日程安排和时间换算场景。"
-                url: "https://mcpmarket.cn/mcp/5ab9ea8d24fb9bd50a647c14"
+                desc: "麦当劳点餐工具"
+                url: "https://mcp.mcd.cn"
                 headers:
-                    "Content-Type": "application/json"
-                    "Accept": "application/json, text/event-stream"
+                    "Authorization": "Bearer ${MCD_KEY}"
             "WebSearch":
                 enable: true
                 desc: "基于通义实验室 Text-Embedding，GTE-reRank，Query 改写，搜索判定等多种检索模型及语义理解，串接专业搜索工程框架及各类型实时信息检索工具，提供实时互联网全栈信息检索，提升 LLM 回答准确性及时效性。"
@@ -74,14 +80,5 @@ capabilities:   # 能力
         skills_paths:
             - "./skills"
 plugin_config:  # 插件配置
-    base_module: "src.plugins"
-    plugins:
-        - 
-            module_path: "wxauto_plugin.wxauto_plugin"
-            class_name: "WXAutoPlugin"
-        - 
-            module_path: "session_plugin.session_plugin"
-        - 
-            module_path: "ipc_plugin.ipc_plugin"
-            class_name: "IPCPlugin"
+    search_path: "src/plugins"
 

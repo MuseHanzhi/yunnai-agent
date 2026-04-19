@@ -1,28 +1,33 @@
 # import inspect
 from asyncio import AbstractEventLoop
-
+import os
 
 from openai.types.chat import ChatCompletionChunk, ChatCompletion
+
 from src.components.ai_chat.chat_state import ChatState
 from src.types.lfecycle_hooks import Hooks
 
 from typing import (
     TYPE_CHECKING,
+    Literal,
     Any
 )
 if TYPE_CHECKING:
     from src.application import Application
 
-class Plugin:
-    
-    def __str__(self) -> str:
-        return f"<plguin: {self.name}, ver: {self.version}, desc: {self.desc}>"
-
-    def __init__(self, name: str, version: str = "1.0", desc: str = ""):
+IPCTiming = Literal["before", "after"]
+class PluginInfo:
+    def __init__(self, name: str, author: str, version: str, description: str):
         self.name = name
+        self.author = author
         self.version = version
-        self.desc = desc
-        self.hook_registry: list[Hooks] = []
+        self.description = description
+
+class Plugin:
+    info: PluginInfo
+    def __init__(self):
+        self.enable = True
+
 
     def deinit(self):
         """
@@ -30,19 +35,17 @@ class Plugin:
         """
         ...
     
-    def on_app_before_initialize(self, app: "Application", event_loop: "AbstractEventLoop"):
+    def on_app_before_initialize(self, app: "Application"):
         """
         应用程序初始化前触发
         
         :param app: 主程序实例
-        :param event_loop: 异步事件循环（未运行）
         """
         ...
     
-    def on_app_after_initialized(self, event_loop: "AbstractEventLoop"):
+    def on_app_after_initialized(self):
         """
         应用程序初始化后触发
-        :param event_loop: 异步事件循环（未运行）
         """
         ...
     

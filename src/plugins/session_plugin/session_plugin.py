@@ -1,10 +1,11 @@
-from typing import Literal, TYPE_CHECKING, Any
+from typing import Literal, TYPE_CHECKING
 import asyncio
 
 from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessageParam
 
 from src.components.ai_chat.chat_state import ChatState
 from src.plugins.plugin import Plugin
+from src.plugins.hook_registry import registry
 
 
 if TYPE_CHECKING:
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
 
 class SessionPlugin(Plugin):
     def __init__(self):
-        super().__init__("session-plugin", desc="管理会话")
+        super().__init__()
         self.chat_records: list[ChatCompletionMessageParam] = []
         self.agent_records: list[ChatCompletionMessageParam] = []
         self.response_text: str = ""
@@ -20,16 +21,13 @@ class SessionPlugin(Plugin):
         self.type: Literal["chat", "agent"] = "chat"
         self.app: "Application | None" = None
         self.future: asyncio.Future | None = asyncio.Future()
-        self.hook_registry = [
-            "on_app_before_initialize",
-            "on_message_before_send",
-            "on_llm_response",
-            "on_message_after_sended"
-        ]
     
-    def on_app_before_initialize(self, app: "Application", event_loop):
+
+    @registry.on_app_before_initialize()
+    def on_app_before_initialize(self, app: "Application"):
         self.app = app
     
+    @registry.on_message_before_send()
     def on_message_before_send(self, state: ChatState):
         if self.type == "chat":
             state.messages = self.chat_records
@@ -44,12 +42,14 @@ class SessionPlugin(Plugin):
             self.agent_records = []
         self.type = state.type
     
+    @registry.on_message_after_sended()
     def on_message_after_sended(self, state: ChatState):
         if self.type == "chat":
             self.chat_records.append(state.message)
         elif self.type == "agent":
             self.agent_records.append(state.message)
     
+    @registry.on_llm_response()
     def on_llm_response(self, chat_completion: "ChatCompletionChunk | ChatCompletion"):
         if not chat_completion.choices:
             return

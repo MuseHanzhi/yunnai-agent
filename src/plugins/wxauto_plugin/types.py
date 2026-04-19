@@ -12,6 +12,7 @@ class AgentPromptPathOption(TypedDict):
     chat: str
 
 class AgentOption(TypedDict):
+    word_delay: float
     prompt_path: AgentPromptPathOption
 
 class ListenOption(TypedDict):

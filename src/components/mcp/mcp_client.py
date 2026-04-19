@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 OnConnectedHandler = Callable[[], None]
 OnConnectErrorHandler = Callable[[Exception], None]
-logger = LogCreator.instance.create(__name__)
+logger = LogCreator().instance.create(__name__)
 class MCPClient:
     def __init__(self, client_info: "ClientInfo", config: Union[MCPStdioOption, MCPStreamableHTTPOption]):
         self.session: ClientSession | None = None

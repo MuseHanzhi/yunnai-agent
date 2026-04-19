@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import TypedDict, Literal
 
 class ModelOptions(TypedDict):
     model_name: str
@@ -9,5 +9,5 @@ class MessageDataOptions(TypedDict):
     text: str
 
 class MessageOptions(TypedDict):
-    options: ModelOptions
-    data: MessageDataOptions
+    message: str
+    type: Literal["user", "system"]

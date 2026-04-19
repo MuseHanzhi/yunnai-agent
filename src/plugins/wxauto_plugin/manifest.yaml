@@ -1,0 +1,5 @@
+name: "wxauto_plugin"
+author: "慕色寒枝"
+version: "2.0.0"
+description: "使用wxautox4编写的一个微信机器人"
+entry: "wxauto_plugin.WXAutoPlugin"  # 插件入口main.py下的WXAutoPlugin类

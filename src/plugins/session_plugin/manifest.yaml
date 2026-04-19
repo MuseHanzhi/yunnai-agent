@@ -1,0 +1,5 @@
+name: "session_plugin"
+author: "慕色寒枝"
+version: "1.0.0"
+description: "记录大模型的会话信息"
+entry: "session_plugin.SessionPlugin"

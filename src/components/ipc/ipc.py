@@ -53,19 +53,18 @@ class IPCServer:
         """设置 WebSocket 服务器的事件处理器"""
         self.websocket_conn.event_bind_disconnect(self._handle_close)
         self.websocket_conn.event_bind_connected(self._connected_handler)
-        
-        # 注册内置的 ping 处理器，自动响应心跳
-        self.handle("ping", self._handle_ping)
+    
+    async def ping(self):
+        while True:
+            await asyncio.sleep(0.5)
+            await self.emit("ping")
     
     def _connected_handler(self):
+        asyncio.get_event_loop().create_task(self.ping())
         event_loop = asyncio.get_event_loop()
         event_loop.create_task(self.websocket_conn.listen(self._handle_raw_message))
         if self.on_ipc_ready:
             self.on_ipc_ready()
-
-    def _handle_ping(self, data: dict):
-        """处理心跳，自动回复 pong"""
-        return "pong"
     
     async def _handle_raw_message(self, raw_bytes: bytes):
         event_loop = asyncio.get_event_loop()
@@ -83,7 +82,7 @@ class IPCServer:
             elif ipc_data['type'] == 'invoke-req':
                 # 服务端请求调用客户端方法
                 asyncio.get_event_loop().create_task(self._handle_invoke_request(ipc_data))
-            elif ['type'] == 'invoke-res':
+            elif ipc_data['type'] == 'invoke-res':
                 # 服务端响应客户端的 invoke 请求
                 self._handle_invoke_response(ipc_data)
                 

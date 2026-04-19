@@ -4,6 +4,7 @@ import asyncio
 import threading
 from datetime import datetime
 
+import pypinyin
 from mcp.types import TextContent
 from openai.types.chat import ChatCompletionContentPartParam
 from wxautox4.msgs import (
@@ -12,7 +13,8 @@ from wxautox4.msgs import (
     VoiceMessage,
     EmotionMessage,
     ImageMessage,
-    HumanMessage
+    HumanMessage,
+    QuoteMessage
 )
 from wxautox4 import WeChat, Chat
 
@@ -101,7 +103,7 @@ class WeChatClient(WeChat):
                     return
                 t_message["content"] = f"<群聊[{chat.who}] 用户: {message.sender}>: {text}"
             else:
-                t_message["content"] = text
+                t_message["content"] = f"<私信[{chat.who}]: {text}>"
             # message.click()
         elif isinstance(message, TextMessage):
             text = message.content
@@ -113,7 +115,7 @@ class WeChatClient(WeChat):
                     return
                 t_message["content"] = f"<群聊[{chat.who}] 用户: {message.sender}>: {text}"
             else:
-                t_message["content"] = text
+                t_message["content"] = f"<私信[{chat.who}]: {text}>"
         elif isinstance(message, EmotionMessage):
             text = f"[发送了一个表情: {message.content}]"
             metadata = self.who_metadata.get(chat.who, {"type": "private"})
@@ -124,8 +126,8 @@ class WeChatClient(WeChat):
                     return
                 t_message["content"] = f"<群聊[{chat.who}] 用户: {message.sender}>: {text}"
             else:
-                t_message["content"] = text
-        elif isinstance(message, HumanMessage) and message.type == "quote":
+                t_message["content"] = f"<私信[{chat.who}]: {text}>"
+        elif isinstance(message, QuoteMessage) and message.type == "quote":
             text = message.content
             text = message.content
             metadata = self.who_metadata.get(chat.who, {"type": "private"})
@@ -259,9 +261,14 @@ id: {id}
         is_first = True
         logger.info(f"有{len(contents)}条回复")
         for msg in contents:
-            # 一个字符延迟0.25秒，然后随机抖动0.0-1.0秒
+            # 一个字符延迟秒，然后随机抖动0.0-1.0秒
             if not is_first:
-                wait_seconds = 0.25 * len(msg) + random.random()
+                delay = 0
+                p = pypinyin.pinyin(msg)
+                for w in p:
+                    delay += self.config["agent"]["word_delay"] * len(w[0])
+                
+                wait_seconds = delay + random.random()
                 logger.info(f"waiting {wait_seconds:.2f} seconds...")
                 await asyncio.sleep(wait_seconds)
             if is_first and isinstance(message, HumanMessage):

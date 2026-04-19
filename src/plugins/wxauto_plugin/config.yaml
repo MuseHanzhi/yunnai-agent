@@ -5,6 +5,7 @@ oss:
     region: "cn-beijing"
     bucket: "yunnai-agent-oss"
 agent:
+    word_delay: 0.1
     prompt_path:
         chat: "./prompts/chat.md"
 listen:

@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import typing
 import os
+import sys
 
 from openai.types.chat import (
     ChatCompletionChunk,
@@ -10,9 +11,11 @@ from openai.types.chat import (
 
 from src.components.mcp.mcp_manager import MCPManager
 from src.components.ai_chat import AIChat, ChatState
-from src.components.plugin_manager import PluginManager
+from src.components.plugin_manager.plugin_manager import PluginManager, Hooks, IPCTiming
 from src.components.logger.logger import LogCreator
 from src.components.app_config import app_config
+from src.components.ipc.ipc import IPCServer
+from src.components.ipc_handlers.ipc_handler import IPCHandler
 
 logger = LogCreator.instance.create(__name__)
 class Application:
@@ -39,9 +42,37 @@ class Application:
         self.plugin_manager = PluginManager()
         self.ai_client: AIChat = Application._load_ai_client_component()
         self.mcp_manager: MCPManager | None = Application._load_mcp_component()
+        self.ipc_server: IPCServer | None = self._setup_ipc()
         
         # 全局变量
         self.completed_text = ""
+    
+    def on_ipc_ready(self):
+        self.plugin_manager.trigger("on_ready", "before")
+        self.plugin_manager.trigger("on_ready", "after")
+        if self.ipc_server:
+            handler = IPCHandler(self, self.ipc_server)
+            handler.init()
+
+    def on_ipc_error(self, error: Exception):
+        logger.error(f"IPC服务启动异常: {error}", exc_info=error)
+        sys.exit(1)
+    
+    def _setup_ipc(self) -> None | IPCServer :
+        launch_ipc_uri = self.launch_args.get("ipc_uri")
+        ipc_config = app_config.config["system"]["ipc"]
+        if launch_ipc_uri is None and not ipc_config.get("enable", False):
+            return None
+            
+        uri = launch_ipc_uri if launch_ipc_uri else ipc_config.get("uri")
+        if uri is None:
+            raise ValueError("未配置IPC服务地址")
+        
+        ipc_server = IPCServer(uri)
+        ipc_server.on_ipc_ready = self.on_ipc_ready
+        ipc_server.on_ipc_error = self.on_ipc_error
+        self.event_loop.create_task(ipc_server.start())     # 需要等run_forever启动后才能运行
+        return ipc_server
     
     @staticmethod
     def _load_ai_client_component():
@@ -96,8 +127,10 @@ class Application:
         }
     
     def exit(self):
+        if self.ipc_server:
+            self.event_loop.run_until_complete(self.ipc_server.emit("on_app_will_close"))
         self.event_loop.stop()
-        # event_loop.close()
+        logger.info("结束事件循环")
     
     async def run_in_thread(self, func, *args, **kwargs):
         try:
@@ -120,14 +153,23 @@ class Application:
 
         self.plugin_manager.trigger(
             "on_app_before_initialize",
-            app = self,
-            event_loop = self.event_loop
+            "before",
+            app = self
+            )
+        self.plugin_manager.trigger(
+            "on_app_before_initialize",
+            "after",
+            app = self
             )
 
         # 触发插件对应时机
         self.plugin_manager.trigger(
             "on_app_after_initialized",
-            event_loop = self.event_loop
+            "before"
+            )
+        self.plugin_manager.trigger(
+            "on_app_after_initialized",
+            "after"
             )
         logger.info("初始化应用程序完毕")
     
@@ -137,8 +179,20 @@ class Application:
                 async for chunk in self.ai_client.stream_response(state):
                     self.plugin_manager.trigger(
                         "on_llm_response",
+                        "before",
                         chat_completion = chunk
                     )
+                    if self.ipc_server:
+                        await self.ipc_server.emit(
+                            "llm_response",
+                            chat_completion = chunk
+                        )
+                    self.plugin_manager.trigger(
+                        "on_llm_response",
+                        "after",
+                        chat_completion = chunk
+                    )
+
             except Exception as ex:
                 logger.info(f"大模型响应时出现异常: {ex}", exc_info=ex)
         else:
@@ -146,10 +200,22 @@ class Application:
                 completion: ChatCompletion = await self.ai_client.non_stream_response(state)
                 self.plugin_manager.trigger(
                     "on_llm_response",
+                    "before",
+                    chat_completion = completion
+                )
+                if self.ipc_server:
+                    await self.ipc_server.emit(
+                        "llm_response",
+                        chat_completion = completion
+                    )
+                self.plugin_manager.trigger(
+                    "on_llm_response",
+                    "after",
                     chat_completion = completion
                 )
             except Exception as ex:
                 logger.info(f"大模型响应时出现异常: {ex}", exc_info=ex)
+        logger.info("大模型响应结束")
     
     async def send_message(self, message: str, msg_type: typing.Literal["user", "system"] = "user"):
         state = self.ai_client.create_state({
@@ -166,30 +232,48 @@ class Application:
         # 自动注入MCP列表
         if self.mcp_manager and app_config.config["capabilities"]["mcp"]["enable"] and app_config.config["capabilities"]["mcp"]["auto_inject"]:
             state.set_mcp_list(self.mcp_manager.mcp_servers)
-            
         state.msg_type = msg_type
-        self.plugin_manager.trigger("on_message_before_send", state=state)
+        self.plugin_manager.trigger("on_message_before_send", "before", state=state)
+        if self.ipc_server:
+            result_state = await self.ipc_server.invoke(
+                "message_before_send",
+                state = state
+            )
+            state.change_from_dict(result_state)
+        self.plugin_manager.trigger("on_message_before_send", "after", state=state)
         if state.canceled:
             return
         
+        logger.info("大模型开始响应")
         self.event_loop.create_task(self._start_response(state))
-        self.plugin_manager.trigger("on_message_after_sended", state=state)
+        self.plugin_manager.trigger("on_message_after_sended", "before", state=state)
+        if self.ipc_server:
+            await self.ipc_server.emit(
+                "on_message_after_sended",
+                state = state
+            )
+        self.plugin_manager.trigger("on_message_after_sended", "after", state=state)
 
     def run(self):
         try:
-            self.plugin_manager.trigger("on_ready")
+            if not self.ipc_server:
+                self.plugin_manager.trigger("on_ready", "before")
+                self.plugin_manager.trigger("on_ready", "after")
             logger.info("开启事件循环")
             self.event_loop.run_forever()
         except KeyboardInterrupt:
+            logger.info("用户已退出")
             self.exit()
             return 0
         except Exception as e:
             logger.error(f"出现异常: {e}")
             return 1
-        try:
-            self.plugin_manager.trigger("on_app_will_close")
-        except Exception as err:
-            logger.error(f"出现异常: {err}")
+        finally:
+            try:
+                self.plugin_manager.trigger("on_app_will_close", "before",)
+                self.plugin_manager.trigger("on_app_will_close", "after",)
+            except Exception as err:
+                logger.error(f"出现异常: {err}")
             return 1
         logger.info("主线程退出")
         return 0

@@ -18,13 +18,15 @@ class Handler:
         self.init()
     
     def init(self):
-        self.ipc.on('send-msg', self.send_msg)
-        self.ipc.on('close-app', self.close_app)
+        self.ipc.on('send_message', self.send_message)
+        self.ipc.on('close_app', self.close_app)
     
     def close_app(self, params: dict):
         self.app.exit()
     
-    def send_msg(self, params: Any):
+    def send_message(self, params: Any):
+        print("收到消息")
         message: MessageOptions = params
-        text: str | None = message["data"]["text"]
-        self.event_loop.create_task(self.app.send_message(text))
+        text = message['message']
+        type = message['type']
+        self.event_loop.create_task(self.app.send_message(text, type))
